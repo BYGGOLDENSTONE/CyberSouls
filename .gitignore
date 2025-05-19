@@ -1,0 +1,22 @@
+# Ignore everything by default
+*
+
+# But un-ignore the .gitignore file itself and the .gitattributes file
+!.gitignore
+!.gitattributes
+
+# Un-ignore the Source folder and everything inside it
+!Source/
+!Source/**
+
+# Un-ignore your .uproject file (essential for opening the project)!*.uproject
+
+# Optional: If you have a C++ project, you might also want to track your project's target files
+# and build configuration, though these can sometimes be regenerated.
+# If you decide to include them, add these lines:
+# !*.Target.cs
+# !Source/*.Target.cs
+# !Source/*/*.Target.cs
+# !Source/*/*/*.Target.cs
+# !Config/
+# !Config/**
