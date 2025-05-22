@@ -49,16 +49,6 @@ class AcybersoulsCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
-	/** Target Lock Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* TargetLockAction;
-
-	/** Target Change Input Actions */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* TargetChangeLeftAction;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* TargetChangeRightAction;
 
 	/** Slash Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -76,6 +66,10 @@ class AcybersoulsCharacter : public ACharacter
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* QuickHack4Action;
+
+	/** Camera Toggle Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* CameraToggleAction;
 
 	/** Game system components */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
@@ -99,8 +93,6 @@ class AcybersoulsCharacter : public ACharacter
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
 	class UQuickHackComponent* KillAbility;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
-	UTargetLockComponent* TargetLockComponent;
 
 public:
 	AcybersoulsCharacter();
@@ -114,12 +106,6 @@ protected:
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 
-	/** Called for target lock input */
-	void ToggleTargetLock();
-
-	/** Called for target change input */
-	void ChangeTargetLeft();
-	void ChangeTargetRight();
 
 	/** Called for slash input */
 	void PerformSlash();
@@ -130,14 +116,16 @@ protected:
 	void UseQuickHack3();
 	void UseQuickHack4();
 
-	/** Target part change with mouse movement */
-	void UpdateTargetPart(const FInputActionValue& Value);
+	/** Called for camera toggle input */
+	void ToggleCameraView();
+
+	/** Crosshair-based aiming */
+	void UpdateCrosshairTarget();
+	void DetermineCrosshairBodyPart(const FHitResult& HitResult);
 	
-	/** Camera lock functionality */
-	void UpdateCameraLock(float DeltaTime);
-	void OnTargetLocked(AActor* Target, EBodyPart BodyPart);
-	void OnTargetUnlocked();
-	FVector GetBodyPartLocation(AActor* Target, EBodyPart BodyPart) const;
+public:
+	AActor* GetCrosshairTarget() const;
+	EBodyPart GetCrosshairBodyPart() const;
 			
 
 protected:
@@ -169,23 +157,17 @@ public:
 	FORCEINLINE class UQuickHackComponent* GetFirewallAbility() const { return FirewallAbility; }
 	/** Returns KillAbility subobject **/
 	FORCEINLINE class UQuickHackComponent* GetKillAbility() const { return KillAbility; }
-	/** Returns TargetLockComponent subobject **/
-	FORCEINLINE class UTargetLockComponent* GetTargetLockComponent() const { return TargetLockComponent; }
 
 private:
-	// Camera lock state
-	bool bIsCameraLocked = false;
-	AActor* LockedTarget = nullptr;
-	EBodyPart LockedBodyPart = EBodyPart::UpperBody;
+	// Camera view state
+	bool bIsFirstPersonView = false;
 	
-	// Camera lock settings
-	UPROPERTY(EditAnywhere, Category = "Camera Lock")
-	float CameraLockInterpSpeed = 5.0f;
+	// Crosshair targeting
+	AActor* CrosshairTarget = nullptr;
+	EBodyPart CrosshairBodyPart = EBodyPart::UpperBody;
 	
-	UPROPERTY(EditAnywhere, Category = "Camera Lock")
-	float CameraLockOffsetZ = 50.0f;
-	
-	UPROPERTY(EditAnywhere, Category = "Camera Lock")
-	float CameraLockDistance = 500.0f;
+	// Crosshair settings
+	UPROPERTY(EditAnywhere, Category = "Crosshair")
+	float CrosshairRange = 2000.0f;
 };
 

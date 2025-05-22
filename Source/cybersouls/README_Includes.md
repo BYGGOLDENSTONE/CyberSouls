@@ -25,13 +25,12 @@ All include paths now follow the pattern:
 Files that had their include paths updated for the character relocation:
 - `Private/Character/cybersoulsCharacter.cpp`
 - `Private/Game/cybersoulsGameMode.cpp`
-- `Private/Enemy/CybersoulsEnemyAIController.cpp`
 - `Private/UI/CybersoulsHUD.cpp`
-- `Private/AI/CybersoulsAIController.cpp`
 
 ### 6. New AI System Dependencies
-- Created basic AI controller with proper includes
-- Enemy AI controller now inherits from basic AI controller
+- Physical enemies use `PhysicalEnemyAIController`
+- Hacking enemies use `HackingEnemyAIController`
+- Both controllers inherit directly from `AAIController`
 - All AI includes use full paths
 
 ## Verification

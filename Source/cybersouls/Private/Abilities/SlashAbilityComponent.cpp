@@ -1,6 +1,6 @@
 // SlashAbilityComponent.cpp
 #include "cybersouls/Public/Abilities/SlashAbilityComponent.h"
-#include "cybersouls/Public/Combat/TargetLockComponent.h"
+#include "cybersouls/Public/Character/cybersoulsCharacter.h"
 #include "cybersouls/Public/Abilities/BlockAbilityComponent.h"
 #include "cybersouls/Public/Abilities/DodgeAbilityComponent.h"
 #include "cybersouls/Public/Attributes/EnemyAttributeComponent.h"
@@ -118,16 +118,16 @@ TArray<AActor*> USlashAbilityComponent::GetTargetsInRange() const
 		FoundTargets
 	);
 	
-	// Filter by angle if we have a target lock
-	UTargetLockComponent* TargetLock = GetOwner()->FindComponentByClass<UTargetLockComponent>();
-	if (TargetLock && TargetLock->IsLocked())
+	// Filter by crosshair target if we have one
+	AcybersoulsCharacter* PlayerChar = Cast<AcybersoulsCharacter>(GetOwner());
+	if (PlayerChar)
 	{
-		AActor* LockedTarget = TargetLock->GetCurrentTarget();
-		if (LockedTarget && FoundTargets.Contains(LockedTarget))
+		AActor* CrosshairTarget = PlayerChar->GetCrosshairTarget();
+		if (CrosshairTarget && FoundTargets.Contains(CrosshairTarget))
 		{
-			// If we have a locked target, prioritize it
+			// If we have a crosshair target, prioritize it
 			TArray<AActor*> FilteredTargets;
-			FilteredTargets.Add(LockedTarget);
+			FilteredTargets.Add(CrosshairTarget);
 			return FilteredTargets;
 		}
 	}
@@ -137,10 +137,10 @@ TArray<AActor*> USlashAbilityComponent::GetTargetsInRange() const
 
 EBodyPart USlashAbilityComponent::GetTargetedBodyPart() const
 {
-	UTargetLockComponent* TargetLock = GetOwner()->FindComponentByClass<UTargetLockComponent>();
-	if (TargetLock)
+	AcybersoulsCharacter* PlayerChar = Cast<AcybersoulsCharacter>(GetOwner());
+	if (PlayerChar)
 	{
-		return TargetLock->GetTargetedBodyPart();
+		return PlayerChar->GetCrosshairBodyPart();
 	}
 	
 	return EBodyPart::UpperBody; // Default

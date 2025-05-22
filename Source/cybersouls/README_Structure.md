@@ -11,7 +11,8 @@ Source/cybersouls/
 ├── cybersouls.h              (Module header - root)
 ├── Public/                   (All header files)
 │   ├── AI/
-│   │   └── CybersoulsAIController.h
+│   │   ├── PhysicalEnemyAIController.h
+│   │   └── HackingEnemyAIController.h
 │   ├── Abilities/
 │   │   └── AbilityComponent.h
 │   ├── Attributes/
@@ -22,15 +23,15 @@ Source/cybersouls/
 │   │   ├── BodyPartComponent.h
 │   │   └── TargetLockComponent.h
 │   ├── Enemy/
-│   │   ├── CybersoulsEnemyBase.h
-│   │   └── CybersoulsEnemyAIController.h
+│   │   └── CybersoulsEnemyBase.h
 │   ├── Game/
 │   │   └── cybersoulsGameMode.h
 │   └── UI/
 │       └── CybersoulsHUD.h
 └── Private/                  (All cpp files)
     ├── AI/
-    │   └── CybersoulsAIController.cpp
+    │   ├── PhysicalEnemyAIController.cpp
+    │   └── HackingEnemyAIController.cpp
     ├── Abilities/
     │   └── AbilityComponent.cpp
     ├── Attributes/
@@ -41,8 +42,7 @@ Source/cybersouls/
     │   ├── BodyPartComponent.cpp
     │   └── TargetLockComponent.cpp
     ├── Enemy/
-    │   ├── CybersoulsEnemyBase.cpp
-    │   └── CybersoulsEnemyAIController.cpp
+    │   └── CybersoulsEnemyBase.cpp
     ├── Game/
     │   └── cybersoulsGameMode.cpp
     └── UI/
@@ -61,14 +61,14 @@ All include paths have been updated to use the full path from the module root:
 - All other cpp files are now in the Private directory
 - Game-related files (GameMode) are in their own Game subdirectory
 - Character files are now in the Character subdirectory
-- Basic AI controller has been added for enemy movement
+- AI controllers are specialized by enemy type
 - Include paths have been updated to reflect the new structure
 
 ## Key Components
 
 ### AI System
-- **CybersoulsAIController**: Basic AI controller that makes enemies follow the player
-- **CybersoulsEnemyAIController**: Specialized enemy AI controller (inherits from basic AI)
+- **PhysicalEnemyAIController**: AI for melee enemies with search behavior and communication
+- **HackingEnemyAIController**: AI for ranged enemies with hacking abilities and QuickHacks
 
 ### Character
 - **cybersoulsCharacter**: Main player character class

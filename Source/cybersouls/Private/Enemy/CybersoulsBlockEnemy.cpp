@@ -3,11 +3,15 @@
 #include "cybersouls/Public/Attributes/PhysicalEnemyAttributeComponent.h"
 #include "cybersouls/Public/Abilities/AttackAbilityComponent.h"
 #include "cybersouls/Public/Abilities/BlockAbilityComponent.h"
+#include "cybersouls/Public/AI/PhysicalEnemyAIController.h"
 
 ACybersoulsBlockEnemy::ACybersoulsBlockEnemy()
 {
 	// Set enemy type
 	EnemyType = EEnemyType::Block;
+	
+	// Set AI controller class for physical enemy
+	AIControllerClass = APhysicalEnemyAIController::StaticClass();
 	
 	// Create components
 	EnemyAttributes = CreateDefaultSubobject<UPhysicalEnemyAttributeComponent>(TEXT("EnemyAttributes"));

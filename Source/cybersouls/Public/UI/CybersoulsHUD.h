@@ -21,12 +21,16 @@ protected:
 private:
 	class AcybersoulsCharacter* PlayerCharacter;
 	class UFont* HUDFont;
+	bool bShowXPDisplay;
 
 	void DrawIntegrityBar();
 	void DrawHackProgressBar();
 	void DrawQuickHackStatus();
 	void DrawTargetInfo();
 	void DrawTargetBodyPartIndicator();
-	void DrawEnemyQuickHackCasting();
 	void DrawXPDisplay();
+	void DrawCrosshair();
+	
+public:
+	void ShowXPDisplay() { bShowXPDisplay = true; }
 };

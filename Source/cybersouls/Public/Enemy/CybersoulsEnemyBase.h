@@ -66,6 +66,16 @@ protected:
 
 	// Handle ragdoll death sequence
 	virtual void StartDeathSequence();
+	
+	// Shatter death effect components
+	// Note: We create skeletal mesh pieces dynamically
+	
+	// Create shattered mesh pieces
+	void CreateShatteredPieces();
+	
+	// Number of shatter pieces to create
+	UPROPERTY(EditDefaultsOnly, Category = "Death Effect")
+	int32 ShatterPieceCount = 50;
 
 	// Default AI Controller class to use
 	virtual TSubclassOf<AController> GetDefaultControllerClass() const;

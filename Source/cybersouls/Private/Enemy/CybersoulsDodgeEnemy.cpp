@@ -3,11 +3,15 @@
 #include "cybersouls/Public/Attributes/PhysicalEnemyAttributeComponent.h"
 #include "cybersouls/Public/Abilities/AttackAbilityComponent.h"
 #include "cybersouls/Public/Abilities/DodgeAbilityComponent.h"
+#include "cybersouls/Public/AI/PhysicalEnemyAIController.h"
 
 ACybersoulsDodgeEnemy::ACybersoulsDodgeEnemy()
 {
 	// Set enemy type
 	EnemyType = EEnemyType::Dodge;
+	
+	// Set AI controller class for physical enemy
+	AIControllerClass = APhysicalEnemyAIController::StaticClass();
 	
 	// Create components
 	EnemyAttributes = CreateDefaultSubobject<UPhysicalEnemyAttributeComponent>(TEXT("EnemyAttributes"));

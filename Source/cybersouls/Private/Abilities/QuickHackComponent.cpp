@@ -20,25 +20,25 @@ void UQuickHackComponent::BeginPlay()
 	{
 		case EQuickHackType::InterruptProtocol:
 			AbilityName = "InterruptProtocol";
-			CastTime = 5.0f;
+			CastTime = 2.0f;
 			Cooldown = 8.0f;
 			break;
 		case EQuickHackType::SystemFreeze:
 			AbilityName = "SystemFreeze";
-			CastTime = 7.0f;
+			CastTime = 2.0f;
 			Cooldown = 14.0f;
 			EffectDuration = 3.0f;
 			break;
 		case EQuickHackType::Firewall:
 			AbilityName = "Firewall";
-			CastTime = 6.0f;
+			CastTime = 3.0f;
 			Cooldown = 12.0f;
 			EffectDuration = 3.0f;
 			bIsSelfTargeted = true;
 			break;
 		case EQuickHackType::Kill:
 			AbilityName = "Kill";
-			CastTime = 3.0f;
+			CastTime = 4.0f;
 			Cooldown = 10.0f;
 			break;
 		default:

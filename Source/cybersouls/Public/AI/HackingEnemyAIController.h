@@ -21,10 +21,12 @@ class CYBERSOULS_API AHackingEnemyAIController : public AAIController
 
 public:
 	AHackingEnemyAIController();
+	virtual ~AHackingEnemyAIController();
 
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
+	virtual void OnUnPossess() override;
 	virtual void Tick(float DeltaTime) override;
 
 private:
@@ -80,4 +82,22 @@ private:
 	bool CanUseQuickHack(class UQuickHackComponent* QuickHack) const;
 	void ExecuteQuickHack(EEnemyQuickHackType Type);
 	void CacheQuickHackComponents();
+	
+	// Communication system
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Communication")
+	float AlertRadius = 2500.0f; // Larger radius for hacking enemies
+	
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Communication")
+	float AlertUpdateInterval = 1.0f; // Update allies every second
+	
+	bool bIsAlerted = false;
+	FVector AlertLocation;
+	FTimerHandle AlertUpdateTimerHandle;
+	
+	void AlertNearbyEnemies(const FVector& PlayerLocation);
+	void UpdateAlliesWithPlayerLocation();
+	
+public:
+	// Called by other AI controllers to alert this one
+	void ReceiveAlert(const FVector& PlayerLocation);
 };

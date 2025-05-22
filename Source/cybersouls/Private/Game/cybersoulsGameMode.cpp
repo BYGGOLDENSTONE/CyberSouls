@@ -96,5 +96,16 @@ void AcybersoulsGameMode::CompleteQuest()
 		}
 	}
 	
+	// Show XP display in HUD
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (PC)
+	{
+		ACybersoulsHUD* CybersoulsHUD = Cast<ACybersoulsHUD>(PC->GetHUD());
+		if (CybersoulsHUD)
+		{
+			CybersoulsHUD->ShowXPDisplay();
+		}
+	}
+	
 	OnQuestCompleted.Broadcast();
 }

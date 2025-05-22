@@ -38,9 +38,10 @@
      - Six enemy types implemented
      - Type-specific attributes and behaviors
      - Block/Dodge mechanics
-   - `CybersoulsEnemyAIController` for AI behavior:
-     - Physical enemies approach and attack
-     - Hacking enemies maintain distance and hack
+   - AI Controllers:
+     - `PhysicalEnemyAIController`: Melee combat, search behavior, alert system
+     - `HackingEnemyAIController`: Ranged combat, QuickHack usage, distance maintenance
+     - Communication system between enemies
      - Line of sight and range checks
 
 6. **Player Character Updates**

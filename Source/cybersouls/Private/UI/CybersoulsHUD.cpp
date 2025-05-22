@@ -22,6 +22,9 @@ ACybersoulsHUD::ACybersoulsHUD()
 	{
 		HUDFont = HUDFontObject.Object;
 	}
+	
+	// Initialize XP display to hidden
+	bShowXPDisplay = false;
 }
 
 void ACybersoulsHUD::BeginPlay()
@@ -46,6 +49,8 @@ void ACybersoulsHUD::DrawHUD()
 	DrawTargetInfo();
 	DrawTargetBodyPartIndicator();
 	DrawXPDisplay();
+	DrawCrosshair();
+	// Removed DrawEnemyQuickHackCasting - no longer needed
 }
 
 void ACybersoulsHUD::DrawIntegrityBar()
@@ -219,13 +224,7 @@ void ACybersoulsHUD::DrawQuickHackStatus()
 
 void ACybersoulsHUD::DrawTargetInfo()
 {
-	UTargetLockComponent* TargetLock = PlayerCharacter->GetTargetLockComponent();
-	if (!TargetLock || !TargetLock->IsLocked())
-	{
-		return;
-	}
-
-	AActor* Target = TargetLock->GetCurrentTarget();
+	AActor* Target = PlayerCharacter->GetCrosshairTarget();
 	ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(Target);
 	if (!Enemy)
 	{
@@ -250,12 +249,12 @@ void ACybersoulsHUD::DrawTargetInfo()
 	DrawText(EnemyTypeText, FColor::White, InfoX, InfoY, HUDFont);
 
 	// Targeted body part
-	FString BodyPartText = TEXT("Targeting: ");
-	switch (TargetLock->GetTargetedBodyPart())
+	FString BodyPartText = TEXT("Crosshair: ");
+	switch (PlayerCharacter->GetCrosshairBodyPart())
 	{
 		case EBodyPart::UpperBody: BodyPartText += TEXT("Upper Body"); break;
-		case EBodyPart::LeftLeg: BodyPartText += TEXT("Left Leg"); break;
-		case EBodyPart::RightLeg: BodyPartText += TEXT("Right Leg"); break;
+		case EBodyPart::LeftLeg: 
+		case EBodyPart::RightLeg: BodyPartText += TEXT("Legs"); break;
 		default: BodyPartText += TEXT("Unknown"); break;
 	}
 	DrawText(BodyPartText, FColor::Yellow, InfoX, InfoY + 25, HUDFont);
@@ -283,230 +282,86 @@ void ACybersoulsHUD::DrawTargetInfo()
 
 void ACybersoulsHUD::DrawTargetBodyPartIndicator()
 {
-	UTargetLockComponent* TargetLock = PlayerCharacter->GetTargetLockComponent();
-	if (!TargetLock || !TargetLock->IsLocked())
-	{
-		return;
-	}
-	
-	AActor* Target = TargetLock->GetCurrentTarget();
-	ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(Target);
-	if (!Enemy)
-	{
-		return;
-	}
-	
-	// Get the body part component
-	UBodyPartComponent* BodyPartComp = nullptr;
-	EBodyPart TargetedPart = TargetLock->GetTargetedBodyPart();
-	
-	switch (TargetedPart)
-	{
-		case EBodyPart::UpperBody:
-			BodyPartComp = Enemy->UpperBodyPart;
-			break;
-		case EBodyPart::LeftLeg:
-			BodyPartComp = Enemy->LeftLegPart;
-			break;
-		case EBodyPart::RightLeg:
-			BodyPartComp = Enemy->RightLegPart;
-			break;
-	}
-	
-	if (!BodyPartComp)
-	{
-		return;
-	}
-	
-	// Get body part location and convert to screen space
-	FVector BodyPartLocation = BodyPartComp->GetComponentLocation();
-	FVector2D ScreenLocation;
-	
-	if (GetWorld()->GetFirstPlayerController()->ProjectWorldLocationToScreen(BodyPartLocation, ScreenLocation))
-	{
-		// Draw targeting reticle
-		float ReticleSize = 20.0f;
-		FColor ReticleColor = FColor::Yellow;
-		
-		// Draw crosshair
-		DrawLine(ScreenLocation.X - ReticleSize, ScreenLocation.Y, 
-				ScreenLocation.X + ReticleSize, ScreenLocation.Y, ReticleColor, 2.0f);
-		DrawLine(ScreenLocation.X, ScreenLocation.Y - ReticleSize, 
-				ScreenLocation.X, ScreenLocation.Y + ReticleSize, ReticleColor, 2.0f);
-		
-		// Draw corner brackets
-		float BracketSize = ReticleSize * 1.5f;
-		float BracketLength = ReticleSize * 0.5f;
-		
-		// Top-left
-		DrawLine(ScreenLocation.X - BracketSize, ScreenLocation.Y - BracketSize,
-				ScreenLocation.X - BracketSize + BracketLength, ScreenLocation.Y - BracketSize, ReticleColor, 3.0f);
-		DrawLine(ScreenLocation.X - BracketSize, ScreenLocation.Y - BracketSize,
-				ScreenLocation.X - BracketSize, ScreenLocation.Y - BracketSize + BracketLength, ReticleColor, 3.0f);
-		
-		// Top-right
-		DrawLine(ScreenLocation.X + BracketSize, ScreenLocation.Y - BracketSize,
-				ScreenLocation.X + BracketSize - BracketLength, ScreenLocation.Y - BracketSize, ReticleColor, 3.0f);
-		DrawLine(ScreenLocation.X + BracketSize, ScreenLocation.Y - BracketSize,
-				ScreenLocation.X + BracketSize, ScreenLocation.Y - BracketSize + BracketLength, ReticleColor, 3.0f);
-		
-		// Bottom-left
-		DrawLine(ScreenLocation.X - BracketSize, ScreenLocation.Y + BracketSize,
-				ScreenLocation.X - BracketSize + BracketLength, ScreenLocation.Y + BracketSize, ReticleColor, 3.0f);
-		DrawLine(ScreenLocation.X - BracketSize, ScreenLocation.Y + BracketSize,
-				ScreenLocation.X - BracketSize, ScreenLocation.Y + BracketSize - BracketLength, ReticleColor, 3.0f);
-		
-		// Bottom-right
-		DrawLine(ScreenLocation.X + BracketSize, ScreenLocation.Y + BracketSize,
-				ScreenLocation.X + BracketSize - BracketLength, ScreenLocation.Y + BracketSize, ReticleColor, 3.0f);
-		DrawLine(ScreenLocation.X + BracketSize, ScreenLocation.Y + BracketSize,
-				ScreenLocation.X + BracketSize, ScreenLocation.Y + BracketSize - BracketLength, ReticleColor, 3.0f);
-		
-		// Draw body part name
-		FString BodyPartName;
-		switch (TargetedPart)
-		{
-			case EBodyPart::UpperBody: BodyPartName = TEXT("UPPER BODY"); break;
-			case EBodyPart::LeftLeg: BodyPartName = TEXT("LEFT LEG"); break;
-			case EBodyPart::RightLeg: BodyPartName = TEXT("RIGHT LEG"); break;
-		}
-		
-		DrawText(BodyPartName, ReticleColor, ScreenLocation.X - 40, ScreenLocation.Y + BracketSize + 5, HUDFont);
-	}
+	// This function is now obsolete as crosshair handles targeting
+	// Crosshair in center screen shows what you're aiming at
 }
 
-void ACybersoulsHUD::DrawEnemyQuickHackCasting()
-{
-	// Get all enemies in range
-	TArray<AActor*> FoundEnemies;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACybersoulsEnemyBase::StaticClass(), FoundEnemies);
-	
-	float MaxDisplayDistance = 2000.0f; // Only show casting for enemies within this range
-	
-	for (AActor* EnemyActor : FoundEnemies)
-	{
-		ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(EnemyActor);
-		if (!Enemy)
-		{
-			continue;
-		}
-		
-		// Check distance to player
-		float Distance = FVector::Dist(PlayerCharacter->GetActorLocation(), Enemy->GetActorLocation());
-		if (Distance > MaxDisplayDistance)
-		{
-			continue;
-		}
-		
-		// Check for active QuickHacks
-		TArray<UQuickHackComponent*> QuickHacks;
-		Enemy->GetComponents<UQuickHackComponent>(QuickHacks);
-		
-		for (UQuickHackComponent* QuickHack : QuickHacks)
-		{
-			if (QuickHack && QuickHack->IsQuickHackActive())
-			{
-				// Convert enemy position to screen
-				FVector EnemyPosition = Enemy->GetActorLocation() + FVector(0, 0, 150); // Above enemy's head
-				FVector2D ScreenPosition;
-				
-				if (GetWorld()->GetFirstPlayerController()->ProjectWorldLocationToScreen(EnemyPosition, ScreenPosition))
-				{
-					// Draw casting bar
-					float CastPercent = QuickHack->CurrentCastTime / QuickHack->CastTime;
-					float BarWidth = 100.0f;
-					float BarHeight = 10.0f;
-					
-					// Background
-					DrawRect(FLinearColor::Black, ScreenPosition.X - BarWidth/2, ScreenPosition.Y, BarWidth, BarHeight);
-					
-					// Cast progress
-					FLinearColor CastColor = FLinearColor::Red;
-					DrawRect(CastColor, ScreenPosition.X - BarWidth/2, ScreenPosition.Y, BarWidth * CastPercent, BarHeight);
-					
-					// QuickHack name
-					FString QuickHackName;
-					switch (QuickHack->QuickHackType)
-					{
-					case EQuickHackType::InterruptProtocol:
-						QuickHackName = TEXT("Interrupt Protocol");
-						break;
-					case EQuickHackType::SystemFreeze:
-						QuickHackName = TEXT("System Freeze");
-						break;
-					case EQuickHackType::Firewall:
-						QuickHackName = TEXT("Firewall");
-						break;
-					case EQuickHackType::Kill:
-						QuickHackName = TEXT("Kill");
-						break;
-					default:
-						QuickHackName = TEXT("Unknown");
-						break;
-					}
-					
-					// Enemy type + casting text
-					FString EnemyTypeText;
-					switch (Enemy->EnemyType)
-					{
-					case EEnemyType::Netrunner:
-						EnemyTypeText = TEXT("Netrunner");
-						break;
-					case EEnemyType::BuffNetrunner:
-						EnemyTypeText = TEXT("Buff Netrunner");
-						break;
-					case EEnemyType::DebuffNetrunner:
-						EnemyTypeText = TEXT("Debuff Netrunner");
-						break;
-					default:
-						EnemyTypeText = TEXT("Enemy");
-						break;
-					}
-					
-					FString CastingText = FString::Printf(TEXT("%s casting %s"), *EnemyTypeText, *QuickHackName);
-					DrawText(CastingText, FColor::Red, ScreenPosition.X - 75, ScreenPosition.Y - 20, HUDFont);
-					
-					// Cast time remaining
-					float TimeRemaining = QuickHack->CastTime - QuickHack->CurrentCastTime;
-					FString TimeText = FString::Printf(TEXT("%.1fs"), TimeRemaining);
-					DrawText(TimeText, FColor::White, ScreenPosition.X - 15, ScreenPosition.Y + 12, HUDFont);
-				}
-			}
-		}
-	}
-}
+// Removed DrawEnemyQuickHackCasting function - no longer showing enemy casting indicators
+
 void ACybersoulsHUD::DrawXPDisplay()
 {
+	// Only show XP display after quest completion
+	if (!bShowXPDisplay)                                      
+	{
+		return;
+	}
+	
 	UPlayerProgressionComponent* Progression = PlayerCharacter->GetPlayerProgression();
 	if (!Progression)
 	{
 		return;
 	}
 
-	// Position XP display in top right corner for better visibility
-	float XPX = Canvas->SizeX - 350.0f;
-	float XPY = 120.0f;
-	float LineHeight = 35.0f;
+	// Position XP display in top middle of screen
+	float BGWidth = 400.0f;
+	float BGHeight = 140.0f;
+	float XPX = (Canvas->SizeX - BGWidth) * 0.5f;
+	float XPY = 50.0f;
+	float LineHeight = 40.0f;
 
 	// Draw larger XP background with border
-	float BGWidth = 320.0f;
-	float BGHeight = 120.0f;
-	
 	// Dark background with border
-	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.9f), XPX - 15, XPY - 15, BGWidth, BGHeight);
-	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 0.8f), XPX - 15, XPY - 15, BGWidth, 3.0f); // Top border
-	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 0.8f), XPX - 15, XPY - 15, 3.0f, BGHeight); // Left border
-	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 0.8f), XPX + BGWidth - 18, XPY - 15, 3.0f, BGHeight); // Right border
-	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 0.8f), XPX - 15, XPY + BGHeight - 18, BGWidth, 3.0f); // Bottom border
+	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.95f), XPX, XPY, BGWidth, BGHeight);
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 1.0f), XPX, XPY, BGWidth, 4.0f); // Top border
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 1.0f), XPX, XPY, 4.0f, BGHeight); // Left border
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 1.0f), XPX + BGWidth - 4, XPY, 4.0f, BGHeight); // Right border
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 1.0f), XPX, XPY + BGHeight - 4, BGWidth, 4.0f); // Bottom border
 
-	// Large title with cyberpunk styling
-	DrawText(TEXT("▰▰ EXPERIENCE POINTS ▰▰"), FColor::Cyan, XPX, XPY, HUDFont, 1.2f);
+	// Large title with cyberpunk styling - centered
+	float TitleX = XPX + (BGWidth - 240.0f) * 0.5f; // Approximate center for title
+	DrawText(TEXT("▰▰ QUEST COMPLETE ▰▰"), FColor::Cyan, TitleX, XPY + 15, HUDFont, 1.4f);
 
-	// Integrity XP with larger font and bright colors
+	// Integrity XP with larger font and bright colors - centered
 	FString IntegrityXPText = FString::Printf(TEXT("⚡ INTEGRITY XP: %.0f"), Progression->GetIntegrityXP());
-	DrawText(IntegrityXPText, FColor::Green, XPX, XPY + LineHeight, HUDFont, 1.1f);
+	float IntegrityX = XPX + (BGWidth - 200.0f) * 0.5f;
+	DrawText(IntegrityXPText, FColor::Green, IntegrityX, XPY + 15 + LineHeight, HUDFont, 1.2f);
 
-	// Hacking XP with larger font and bright colors
+	// Hacking XP with larger font and bright colors - centered
 	FString HackingXPText = FString::Printf(TEXT("🔧 HACKING XP: %.0f"), Progression->GetHackingXP());
-	DrawText(HackingXPText, FColor::Blue, XPX, XPY + 2 * LineHeight, HUDFont, 1.1f);
+	float HackingX = XPX + (BGWidth - 200.0f) * 0.5f;
+	DrawText(HackingXPText, FColor::Blue, HackingX, XPY + 15 + 2 * LineHeight, HUDFont, 1.2f);
+}
+
+void ACybersoulsHUD::DrawCrosshair()
+{
+	if (!Canvas)
+	{
+		return;
+	}
+
+	// Get screen center
+	float CenterX = Canvas->SizeX * 0.5f;
+	float CenterY = Canvas->SizeY * 0.5f;
+	
+	// Check if aiming at enemy to change crosshair color
+	bool bAimingAtEnemy = PlayerCharacter->GetCrosshairTarget() != nullptr;
+	
+	// Draw small dot crosshair
+	float DotSize = 2.0f;
+	FLinearColor CrosshairColor = bAimingAtEnemy ? FLinearColor::Red : FLinearColor::White;
+	
+	// Draw filled circle (dot) in the center
+	DrawRect(CrosshairColor, CenterX - DotSize, CenterY - DotSize, DotSize * 2, DotSize * 2);
+	
+	// If aiming at enemy, draw additional targeting ring
+	if (bAimingAtEnemy)
+	{
+		float RingSize = 8.0f;
+		
+		// Draw ring lines
+		DrawLine(CenterX - RingSize, CenterY, CenterX - DotSize * 2, CenterY, FColor::Red, 1.0f);
+		DrawLine(CenterX + DotSize * 2, CenterY, CenterX + RingSize, CenterY, FColor::Red, 1.0f);
+		DrawLine(CenterX, CenterY - RingSize, CenterX, CenterY - DotSize * 2, FColor::Red, 1.0f);
+		DrawLine(CenterX, CenterY + DotSize * 2, CenterX, CenterY + RingSize, FColor::Red, 1.0f);
+	}
 }
