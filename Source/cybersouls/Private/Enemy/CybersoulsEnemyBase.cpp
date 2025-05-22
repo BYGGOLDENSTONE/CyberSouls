@@ -2,6 +2,7 @@
 #include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "cybersouls/Public/AI/PhysicalEnemyAIController.h"
 #include "cybersouls/Public/AI/HackingEnemyAIController.h"
+#include "cybersouls/Public/Game/cybersoulsGameMode.h"
 #include "Components/CapsuleComponent.h"
 #include "TimerManager.h"
 #include "Engine/Engine.h"
@@ -99,12 +100,56 @@ void ACybersoulsEnemyBase::OnReceivedDamage(float Damage, EBodyPart HitPart)
 
 void ACybersoulsEnemyBase::OnDeath()
 {
+	if (bIsDead)
+	{
+		return; // Already dead
+	}
+
+	bIsDead = true;
+
+	// Notify game mode of death for quest tracking
+	AGameModeBase* GameMode = GetWorld()->GetAuthGameMode();
+	if (IsValid(GameMode))
+	{
+		if (AcybersoulsGameMode* CybersoulsGameMode = Cast<AcybersoulsGameMode>(GameMode))
+		{
+			CybersoulsGameMode->OnEnemyDeath(this);
+		}
+	}
+
 	// Stop all timers
 	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
 	GetWorldTimerManager().ClearTimer(HackTimerHandle);
+	GetWorldTimerManager().ClearTimer(DeathTimerHandle);
 
-	// TODO: Play death animation, spawn loot, etc.
-	Destroy();
+	// Start death sequence (ragdoll, then destroy after 2 seconds)
+	StartDeathSequence();
+}
+
+void ACybersoulsEnemyBase::StartDeathSequence()
+{
+	// Stop all movement
+	if (Controller)
+	{
+		Controller->StopMovement();
+	}
+
+	// Disable collision with player (keeps physics collision)
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+
+	// Enable ragdoll physics
+	if (GetMesh())
+	{
+		GetMesh()->SetSimulatePhysics(true);
+		GetMesh()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		GetMesh()->SetCollisionResponseToAllChannels(ECR_Block);
+	}
+
+	// Destroy actor after 2 seconds
+	GetWorldTimerManager().SetTimer(DeathTimerHandle, [this]()
+	{
+		Destroy();
+	}, 2.0f, false);
 }
 
 TSubclassOf<AController> ACybersoulsEnemyBase::GetDefaultControllerClass() const

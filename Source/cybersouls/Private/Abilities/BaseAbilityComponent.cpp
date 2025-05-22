@@ -1,5 +1,6 @@
 // BaseAbilityComponent.cpp
 #include "cybersouls/Public/Abilities/BaseAbilityComponent.h"
+#include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 
 UBaseAbilityComponent::UBaseAbilityComponent()
 {
@@ -28,6 +29,22 @@ void UBaseAbilityComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 bool UBaseAbilityComponent::CanActivateAbility()
 {
+	// Don't allow ability activation if owner is invalid or dead
+	AActor* Owner = GetOwner();
+	if (!IsValid(Owner))
+	{
+		return false;
+	}
+	
+	// Check if owner has a dead state
+	if (const ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(Owner))
+	{
+		if (Enemy->IsDead())
+		{
+			return false;
+		}
+	}
+	
 	return CurrentCooldown <= 0.0f && !bIsAbilityActive;
 }
 

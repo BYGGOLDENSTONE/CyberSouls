@@ -1,5 +1,6 @@
 // BlockAbilityComponent.cpp
 #include "cybersouls/Public/Abilities/BlockAbilityComponent.h"
+#include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "Engine/Engine.h"
 
 UBlockAbilityComponent::UBlockAbilityComponent()
@@ -18,6 +19,15 @@ void UBlockAbilityComponent::BeginPlay()
 
 bool UBlockAbilityComponent::TryBlock(EBodyPart AttackedBodyPart)
 {
+	// Check if owner is dead
+	if (ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(GetOwner()))
+	{
+		if (Enemy->IsDead())
+		{
+			return false;
+		}
+	}
+	
 	if (CanBlock(AttackedBodyPart) && CurrentBlockCharges > 0)
 	{
 		ConsumeBlockCharge();

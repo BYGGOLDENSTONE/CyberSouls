@@ -11,7 +11,8 @@ enum class EQuickHackType : uint8
 	None UMETA(DisplayName = "None"),
 	InterruptProtocol UMETA(DisplayName = "Interrupt Protocol"),
 	SystemFreeze UMETA(DisplayName = "System Freeze"),
-	Firewall UMETA(DisplayName = "Firewall")
+	Firewall UMETA(DisplayName = "Firewall"),
+	Kill UMETA(DisplayName = "Kill")
 };
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))

@@ -25,10 +25,10 @@ public:
 	float MaxIntegrity = 100.0f;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes")
-	float HackProgress = 0.0f; // Player dies when this reaches 100
+	float HackProgress = 0.0f; // Player dies when this reaches MaxHackProgress
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes")
-	float MaxHackProgress = 100.0f;
+	float MaxHackProgress = 200.0f; // Testing value - normally 100
 	
 	// Ability availability (can be disabled by QuickHacks)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")

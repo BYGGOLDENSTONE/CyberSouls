@@ -37,19 +37,19 @@ void ACybersoulsNetrunner::InitializeEnemy()
 	// Netrunner specific initialization
 	if (EnemyAttributes)
 	{
-		EnemyAttributes->Integrity = 1.0f; // Dies in one hit
-		EnemyAttributes->MaxIntegrity = 1.0f;
+		EnemyAttributes->Integrity = 100.0f; // Dies in one hit
+		EnemyAttributes->MaxIntegrity = 100.0f;
 	}
 	
 	if (HackAbility)
 	{
-		HackAbility->HackRate = 2.0f;
+		HackAbility->HackRate = 5.0f; // Netrunner: 5 hackprogress per second
 		HackAbility->HackRange = 1500.0f;
 	}
 }
 
 void ACybersoulsNetrunner::OnEnemyDeath()
 {
-	// Handle death
-	Destroy();
+	// Use base class death handling
+	OnDeath();
 }

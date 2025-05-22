@@ -36,6 +36,9 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "Attributes")
 	bool IsAlive() const;
+	
+	UFUNCTION(BlueprintCallable, Category = "Attributes")
+	float GetIntegrity() const { return Integrity; }
 
 protected:
 	virtual void BeginPlay() override;

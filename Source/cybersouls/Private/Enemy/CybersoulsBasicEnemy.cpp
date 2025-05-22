@@ -31,8 +31,8 @@ void ACybersoulsBasicEnemy::InitializeEnemy()
 	// Basic enemy specific initialization
 	if (EnemyAttributes)
 	{
-		EnemyAttributes->Integrity = 1.0f; // Dies in one hit
-		EnemyAttributes->MaxIntegrity = 1.0f;
+		EnemyAttributes->Integrity = 100.0f; // 100 HP
+		EnemyAttributes->MaxIntegrity = 100.0f;
 	}
 	
 	if (AttackAbility)
@@ -45,6 +45,6 @@ void ACybersoulsBasicEnemy::InitializeEnemy()
 
 void ACybersoulsBasicEnemy::OnEnemyDeath()
 {
-	// Handle death
-	Destroy();
+	// Use base class death handling
+	OnDeath();
 }

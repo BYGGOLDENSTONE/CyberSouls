@@ -1,6 +1,8 @@
 // QuickHackComponent.cpp
 #include "cybersouls/Public/Abilities/QuickHackComponent.h"
 #include "cybersouls/Public/Attributes/PlayerAttributeComponent.h"
+#include "cybersouls/Public/Attributes/EnemyAttributeComponent.h"
+#include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "Engine/Engine.h"
 #include "TimerManager.h"
 
@@ -34,6 +36,11 @@ void UQuickHackComponent::BeginPlay()
 			EffectDuration = 3.0f;
 			bIsSelfTargeted = true;
 			break;
+		case EQuickHackType::Kill:
+			AbilityName = "Kill";
+			CastTime = 3.0f;
+			Cooldown = 10.0f;
+			break;
 		default:
 			break;
 	}
@@ -42,6 +49,16 @@ void UQuickHackComponent::BeginPlay()
 void UQuickHackComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	
+	// Check if owner is still alive
+	if (ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(GetOwner()))
+	{
+		if (Enemy->IsDead())
+		{
+			InterruptQuickHack();
+			return;
+		}
+	}
 	
 	if (bIsAbilityActive && CurrentCastTime < CastTime)
 	{
@@ -164,6 +181,23 @@ void UQuickHackComponent::ApplyQuickHackEffect()
 				}, EffectDuration, false);
 				
 				UE_LOG(LogTemp, Warning, TEXT("Firewall: Protection active for %f seconds"), EffectDuration);
+			}
+			break;
+			
+		case EQuickHackType::Kill:
+			// Instantly kill the target enemy
+			{
+				ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(CurrentTarget);
+				if (Enemy)
+				{
+					// Trigger death directly
+					UEnemyAttributeComponent* EnemyAttributes = Enemy->FindComponentByClass<UEnemyAttributeComponent>();
+					if (EnemyAttributes)
+					{
+						EnemyAttributes->TakeDamage(100.0f); // Deal lethal damage
+						UE_LOG(LogTemp, Warning, TEXT("Kill QuickHack: Enemy eliminated"));
+					}
+				}
 			}
 			break;
 			

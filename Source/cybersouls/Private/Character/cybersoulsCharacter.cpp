@@ -11,6 +11,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "cybersouls/Public/Attributes/PlayerAttributeComponent.h"
+#include "cybersouls/Public/Attributes/PlayerProgressionComponent.h"
 #include "cybersouls/Public/Abilities/SlashAbilityComponent.h"
 #include "cybersouls/Public/Abilities/QuickHackComponent.h"
 #include "cybersouls/Public/Abilities/BaseAbilityComponent.h"
@@ -18,6 +19,7 @@
 #include "cybersouls/Public/Combat/BodyPartComponent.h"
 #include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "TimerManager.h"
+#include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -63,10 +65,12 @@ AcybersoulsCharacter::AcybersoulsCharacter()
 
 	// Create game system components
 	PlayerAttributes = CreateDefaultSubobject<UPlayerAttributeComponent>(TEXT("PlayerAttributes"));
+	PlayerProgression = CreateDefaultSubobject<UPlayerProgressionComponent>(TEXT("PlayerProgression"));
 	SlashAbility = CreateDefaultSubobject<USlashAbilityComponent>(TEXT("SlashAbility"));
 	InterruptProtocolAbility = CreateDefaultSubobject<UQuickHackComponent>(TEXT("InterruptProtocolAbility"));
 	SystemFreezeAbility = CreateDefaultSubobject<UQuickHackComponent>(TEXT("SystemFreezeAbility"));
 	FirewallAbility = CreateDefaultSubobject<UQuickHackComponent>(TEXT("FirewallAbility"));
+	KillAbility = CreateDefaultSubobject<UQuickHackComponent>(TEXT("KillAbility"));
 	TargetLockComponent = CreateDefaultSubobject<UTargetLockComponent>(TEXT("TargetLockComponent"));
 }
 
@@ -123,6 +127,14 @@ void AcybersoulsCharacter::BeginPlay()
 		FirewallAbility->QuickHackType = EQuickHackType::Firewall;
 		FirewallAbility->bIsSelfTargeted = true;
 	}
+	
+	if (KillAbility)
+	{
+		KillAbility->QuickHackType = EQuickHackType::Kill;
+		KillAbility->bIsSelfTargeted = false;
+		KillAbility->CastTime = 0.1f; // Very fast cast time for instant kill
+		KillAbility->Cooldown = 1.0f; // Short cooldown
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -166,6 +178,7 @@ void AcybersoulsCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		EnhancedInputComponent->BindAction(QuickHack1Action, ETriggerEvent::Started, this, &AcybersoulsCharacter::UseQuickHack1);
 		EnhancedInputComponent->BindAction(QuickHack2Action, ETriggerEvent::Started, this, &AcybersoulsCharacter::UseQuickHack2);
 		EnhancedInputComponent->BindAction(QuickHack3Action, ETriggerEvent::Started, this, &AcybersoulsCharacter::UseQuickHack3);
+		EnhancedInputComponent->BindAction(QuickHack4Action, ETriggerEvent::Started, this, &AcybersoulsCharacter::UseQuickHack4);
 	}
 	else
 	{
@@ -238,8 +251,11 @@ void AcybersoulsCharacter::ChangeTargetRight()
 
 void AcybersoulsCharacter::PerformSlash()
 {
+	UE_LOG(LogTemp, Warning, TEXT("PerformSlash called!"));
+	
 	if (!SlashAbility)
 	{
+		UE_LOG(LogTemp, Error, TEXT("SlashAbility is null!"));
 		return;
 	}
 
@@ -257,6 +273,7 @@ void AcybersoulsCharacter::PerformSlash()
 		return;
 	}
 
+	UE_LOG(LogTemp, Warning, TEXT("Activating slash ability!"));
 	SlashAbility->ActivateAbility();
 }
 
@@ -387,11 +404,51 @@ FVector AcybersoulsCharacter::GetBodyPartLocation(AActor* Target, EBodyPart Body
 
 void AcybersoulsCharacter::UseQuickHack1()
 {
-	// Interrupt Protocol
+	// Interrupt Protocol - Can be used without lock if enemies are casting
 	if (InterruptProtocolAbility)
 	{
-		AActor* Target = TargetLockComponent ? TargetLockComponent->GetCurrentTarget() : nullptr;
-		InterruptProtocolAbility->StartQuickHack(Target);
+		AActor* Target = nullptr;
+		
+		// First check if we have a locked target
+		if (TargetLockComponent)
+		{
+			Target = TargetLockComponent->GetCurrentTarget();
+		}
+		
+		// If no locked target, check for any enemy casting QuickHack
+		if (!Target)
+		{
+			// Find all enemies in the world
+			TArray<AActor*> FoundEnemies;
+			UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACybersoulsEnemyBase::StaticClass(), FoundEnemies);
+			
+			for (AActor* Enemy : FoundEnemies)
+			{
+				TArray<UQuickHackComponent*> QuickHacks;
+				Enemy->GetComponents<UQuickHackComponent>(QuickHacks);
+				
+				for (UQuickHackComponent* QH : QuickHacks)
+				{
+					if (QH->IsQuickHackActive())
+					{
+						Target = Enemy;
+						UE_LOG(LogTemp, Warning, TEXT("Found enemy casting QuickHack - using as InterruptProtocol target"));
+						break;
+					}
+				}
+				
+				if (Target) break;
+			}
+		}
+		
+		if (Target)
+		{
+			InterruptProtocolAbility->StartQuickHack(Target);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("InterruptProtocol: No target found (need locked target or enemy casting QuickHack)"));
+		}
 	}
 }
 
@@ -411,6 +468,16 @@ void AcybersoulsCharacter::UseQuickHack3()
 	if (FirewallAbility)
 	{
 		FirewallAbility->StartQuickHack(this);
+	}
+}
+
+void AcybersoulsCharacter::UseQuickHack4()
+{
+	// Kill
+	if (KillAbility)
+	{
+		AActor* Target = TargetLockComponent ? TargetLockComponent->GetCurrentTarget() : nullptr;
+		KillAbility->StartQuickHack(Target);
 	}
 }
 

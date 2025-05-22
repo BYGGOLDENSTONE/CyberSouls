@@ -1,9 +1,11 @@
 // HackAbilityComponent.cpp
 #include "cybersouls/Public/Abilities/HackAbilityComponent.h"
 #include "cybersouls/Public/Attributes/PlayerAttributeComponent.h"
+#include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
 
 UHackAbilityComponent::UHackAbilityComponent()
 {
@@ -45,6 +47,16 @@ void UHackAbilityComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 void UHackAbilityComponent::PerformContinuousHack(float DeltaTime)
 {
+	// Check if owner is still alive
+	if (ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(GetOwner()))
+	{
+		if (Enemy->IsDead())
+		{
+			DeactivateAbility();
+			return;
+		}
+	}
+	
 	AActor* Target = GetTarget();
 	if (!Target)
 	{

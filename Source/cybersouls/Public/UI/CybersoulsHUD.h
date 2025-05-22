@@ -28,4 +28,5 @@ private:
 	void DrawTargetInfo();
 	void DrawTargetBodyPartIndicator();
 	void DrawEnemyQuickHackCasting();
+	void DrawXPDisplay();
 };

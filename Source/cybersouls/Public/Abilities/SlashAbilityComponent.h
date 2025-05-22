@@ -15,7 +15,7 @@ public:
 	USlashAbilityComponent();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Slash")
-	float SlashDamage = 10.0f; // One-shots enemies unless they block/dodge
+	float SlashDamage = 100.0f; // One-shots enemies unless they block/dodge
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Slash")
 	float SlashRange = 250.0f;

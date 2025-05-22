@@ -4,6 +4,7 @@
 #include "cybersouls/Public/Abilities/AttackAbilityComponent.h"
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
 #include "NavigationSystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "DrawDebugHelpers.h"
@@ -47,7 +48,7 @@ void APhysicalEnemyAIController::Tick(float DeltaTime)
 
 void APhysicalEnemyAIController::UpdateCombatBehavior()
 {
-	if (!ControlledEnemy || !PlayerTarget)
+	if (!ControlledEnemy || !PlayerTarget || ControlledEnemy->IsDead())
 	{
 		return;
 	}
@@ -139,7 +140,7 @@ void APhysicalEnemyAIController::MoveToTarget()
 
 void APhysicalEnemyAIController::PerformAttack()
 {
-	if (!ControlledEnemy || !PlayerTarget)
+	if (!ControlledEnemy || !PlayerTarget || ControlledEnemy->IsDead())
 	{
 		return;
 	}

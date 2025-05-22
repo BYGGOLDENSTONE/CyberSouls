@@ -2,6 +2,7 @@
 #include "cybersouls/Public/UI/CybersoulsHUD.h"
 #include "cybersouls/Public/Character/cybersoulsCharacter.h"
 #include "cybersouls/Public/Attributes/PlayerAttributeComponent.h"
+#include "cybersouls/Public/Attributes/PlayerProgressionComponent.h"
 #include "cybersouls/Public/Abilities/SlashAbilityComponent.h"
 #include "cybersouls/Public/Abilities/QuickHackComponent.h"
 #include "cybersouls/Public/Abilities/BlockAbilityComponent.h"
@@ -44,6 +45,7 @@ void ACybersoulsHUD::DrawHUD()
 	DrawQuickHackStatus();
 	DrawTargetInfo();
 	DrawTargetBodyPartIndicator();
+	DrawXPDisplay();
 }
 
 void ACybersoulsHUD::DrawIntegrityBar()
@@ -111,13 +113,19 @@ void ACybersoulsHUD::DrawQuickHackStatus()
 	float LineHeight = 25.0f;
 
 	// InterruptProtocol
-	UQuickHackComponent* InterruptProtocol = PlayerCharacter->FindComponentByClass<UQuickHackComponent>();
-	if (InterruptProtocol && InterruptProtocol->QuickHackType == EQuickHackType::InterruptProtocol)
+	if (PlayerCharacter->GetInterruptProtocolAbility())
 	{
+		UQuickHackComponent* InterruptProtocol = PlayerCharacter->GetInterruptProtocolAbility();
 		FString StatusText = TEXT("1. Interrupt Protocol");
 		float Cooldown = InterruptProtocol->CurrentCooldown;
 		
-		if (Cooldown > 0.0f)
+		if (InterruptProtocol->IsQuickHackActive())
+		{
+			// Show casting progress
+			float CastPercent = InterruptProtocol->CurrentCastTime / InterruptProtocol->CastTime;
+			StatusText += FString::Printf(TEXT(" [Casting: %.0f%%]"), CastPercent * 100.0f);
+		}
+		else if (Cooldown > 0.0f)
 		{
 			StatusText += FString::Printf(TEXT(" (%.1fs)"), Cooldown);
 		}
@@ -126,17 +134,24 @@ void ACybersoulsHUD::DrawQuickHackStatus()
 			StatusText += TEXT(" (Ready)");
 		}
 
-		FColor TextColor = Cooldown > 0.0f ? FColor::Red : FColor::Green;
+		FColor TextColor = InterruptProtocol->IsQuickHackActive() ? FColor::Yellow : (Cooldown > 0.0f ? FColor::Red : FColor::Green);
 		DrawText(StatusText, TextColor, 50, StartY, HUDFont);
 	}
 
 	// SystemFreeze
 	if (PlayerCharacter->GetSystemFreezeAbility())
 	{
+		UQuickHackComponent* SystemFreeze = PlayerCharacter->GetSystemFreezeAbility();
 		FString StatusText = TEXT("2. System Freeze");
-		float Cooldown = PlayerCharacter->GetSystemFreezeAbility()->CurrentCooldown;
+		float Cooldown = SystemFreeze->CurrentCooldown;
 		
-		if (Cooldown > 0.0f)
+		if (SystemFreeze->IsQuickHackActive())
+		{
+			// Show casting progress
+			float CastPercent = SystemFreeze->CurrentCastTime / SystemFreeze->CastTime;
+			StatusText += FString::Printf(TEXT(" [Casting: %.0f%%]"), CastPercent * 100.0f);
+		}
+		else if (Cooldown > 0.0f)
 		{
 			StatusText += FString::Printf(TEXT(" (%.1fs)"), Cooldown);
 		}
@@ -145,17 +160,24 @@ void ACybersoulsHUD::DrawQuickHackStatus()
 			StatusText += TEXT(" (Ready)");
 		}
 
-		FColor TextColor = Cooldown > 0.0f ? FColor::Red : FColor::Green;
+		FColor TextColor = SystemFreeze->IsQuickHackActive() ? FColor::Yellow : (Cooldown > 0.0f ? FColor::Red : FColor::Green);
 		DrawText(StatusText, TextColor, 50, StartY + LineHeight, HUDFont);
 	}
 
 	// Firewall
 	if (PlayerCharacter->GetFirewallAbility())
 	{
+		UQuickHackComponent* Firewall = PlayerCharacter->GetFirewallAbility();
 		FString StatusText = TEXT("3. Firewall");
-		float Cooldown = PlayerCharacter->GetFirewallAbility()->CurrentCooldown;
+		float Cooldown = Firewall->CurrentCooldown;
 		
-		if (Cooldown > 0.0f)
+		if (Firewall->IsQuickHackActive())
+		{
+			// Show casting progress
+			float CastPercent = Firewall->CurrentCastTime / Firewall->CastTime;
+			StatusText += FString::Printf(TEXT(" [Casting: %.0f%%]"), CastPercent * 100.0f);
+		}
+		else if (Cooldown > 0.0f)
 		{
 			StatusText += FString::Printf(TEXT(" (%.1fs)"), Cooldown);
 		}
@@ -164,8 +186,34 @@ void ACybersoulsHUD::DrawQuickHackStatus()
 			StatusText += TEXT(" (Ready)");
 		}
 
-		FColor TextColor = Cooldown > 0.0f ? FColor::Red : FColor::Green;
+		FColor TextColor = Firewall->IsQuickHackActive() ? FColor::Yellow : (Cooldown > 0.0f ? FColor::Red : FColor::Green);
 		DrawText(StatusText, TextColor, 50, StartY + 2 * LineHeight, HUDFont);
+	}
+	
+	// Kill
+	if (PlayerCharacter->GetKillAbility())
+	{
+		UQuickHackComponent* Kill = PlayerCharacter->GetKillAbility();
+		FString StatusText = TEXT("4. Kill");
+		float Cooldown = Kill->CurrentCooldown;
+		
+		if (Kill->IsQuickHackActive())
+		{
+			// Show casting progress
+			float CastPercent = Kill->CurrentCastTime / Kill->CastTime;
+			StatusText += FString::Printf(TEXT(" [Casting: %.0f%%]"), CastPercent * 100.0f);
+		}
+		else if (Cooldown > 0.0f)
+		{
+			StatusText += FString::Printf(TEXT(" (%.1fs)"), Cooldown);
+		}
+		else
+		{
+			StatusText += TEXT(" (Ready)");
+		}
+
+		FColor TextColor = Kill->IsQuickHackActive() ? FColor::Yellow : (Cooldown > 0.0f ? FColor::Red : FColor::Green);
+		DrawText(StatusText, TextColor, 50, StartY + 3 * LineHeight, HUDFont);
 	}
 }
 
@@ -380,36 +428,39 @@ void ACybersoulsHUD::DrawEnemyQuickHackCasting()
 					FString QuickHackName;
 					switch (QuickHack->QuickHackType)
 					{
-						case EQuickHackType::InterruptProtocol:
-							QuickHackName = TEXT("Interrupt Protocol");
-							break;
-						case EQuickHackType::SystemFreeze:
-							QuickHackName = TEXT("System Freeze");
-							break;
-						case EQuickHackType::Firewall:
-							QuickHackName = TEXT("Firewall");
-							break;
-						default:
-							QuickHackName = TEXT("Unknown");
-							break;
+					case EQuickHackType::InterruptProtocol:
+						QuickHackName = TEXT("Interrupt Protocol");
+						break;
+					case EQuickHackType::SystemFreeze:
+						QuickHackName = TEXT("System Freeze");
+						break;
+					case EQuickHackType::Firewall:
+						QuickHackName = TEXT("Firewall");
+						break;
+					case EQuickHackType::Kill:
+						QuickHackName = TEXT("Kill");
+						break;
+					default:
+						QuickHackName = TEXT("Unknown");
+						break;
 					}
 					
 					// Enemy type + casting text
 					FString EnemyTypeText;
 					switch (Enemy->EnemyType)
 					{
-						case EEnemyType::Netrunner:
-							EnemyTypeText = TEXT("Netrunner");
-							break;
-						case EEnemyType::BuffNetrunner:
-							EnemyTypeText = TEXT("Buff Netrunner");
-							break;
-						case EEnemyType::DebuffNetrunner:
-							EnemyTypeText = TEXT("Debuff Netrunner");
-							break;
-						default:
-							EnemyTypeText = TEXT("Enemy");
-							break;
+					case EEnemyType::Netrunner:
+						EnemyTypeText = TEXT("Netrunner");
+						break;
+					case EEnemyType::BuffNetrunner:
+						EnemyTypeText = TEXT("Buff Netrunner");
+						break;
+					case EEnemyType::DebuffNetrunner:
+						EnemyTypeText = TEXT("Debuff Netrunner");
+						break;
+					default:
+						EnemyTypeText = TEXT("Enemy");
+						break;
 					}
 					
 					FString CastingText = FString::Printf(TEXT("%s casting %s"), *EnemyTypeText, *QuickHackName);
@@ -423,4 +474,39 @@ void ACybersoulsHUD::DrawEnemyQuickHackCasting()
 			}
 		}
 	}
+}
+void ACybersoulsHUD::DrawXPDisplay()
+{
+	UPlayerProgressionComponent* Progression = PlayerCharacter->GetPlayerProgression();
+	if (!Progression)
+	{
+		return;
+	}
+
+	// Position XP display in top right corner for better visibility
+	float XPX = Canvas->SizeX - 350.0f;
+	float XPY = 120.0f;
+	float LineHeight = 35.0f;
+
+	// Draw larger XP background with border
+	float BGWidth = 320.0f;
+	float BGHeight = 120.0f;
+	
+	// Dark background with border
+	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.9f), XPX - 15, XPY - 15, BGWidth, BGHeight);
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 0.8f), XPX - 15, XPY - 15, BGWidth, 3.0f); // Top border
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 0.8f), XPX - 15, XPY - 15, 3.0f, BGHeight); // Left border
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 0.8f), XPX + BGWidth - 18, XPY - 15, 3.0f, BGHeight); // Right border
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 0.8f), XPX - 15, XPY + BGHeight - 18, BGWidth, 3.0f); // Bottom border
+
+	// Large title with cyberpunk styling
+	DrawText(TEXT("▰▰ EXPERIENCE POINTS ▰▰"), FColor::Cyan, XPX, XPY, HUDFont, 1.2f);
+
+	// Integrity XP with larger font and bright colors
+	FString IntegrityXPText = FString::Printf(TEXT("⚡ INTEGRITY XP: %.0f"), Progression->GetIntegrityXP());
+	DrawText(IntegrityXPText, FColor::Green, XPX, XPY + LineHeight, HUDFont, 1.1f);
+
+	// Hacking XP with larger font and bright colors
+	FString HackingXPText = FString::Printf(TEXT("🔧 HACKING XP: %.0f"), Progression->GetHackingXP());
+	DrawText(HackingXPText, FColor::Blue, XPX, XPY + 2 * LineHeight, HUDFont, 1.1f);
 }

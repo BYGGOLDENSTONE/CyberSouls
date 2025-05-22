@@ -22,6 +22,8 @@ void USlashAbilityComponent::BeginPlay()
 
 void USlashAbilityComponent::ActivateAbility()
 {
+	UE_LOG(LogTemp, Warning, TEXT("Slash ability activated!"));
+	
 	if (CanActivateAbility())
 	{
 		Super::ActivateAbility();
@@ -29,6 +31,10 @@ void USlashAbilityComponent::ActivateAbility()
 		
 		// Auto deactivate after slash
 		DeactivateAbility();
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Slash ability cannot be activated!"));
 	}
 }
 
@@ -42,10 +48,12 @@ void USlashAbilityComponent::PerformSlash()
 	TArray<AActor*> Targets = GetTargetsInRange();
 	EBodyPart TargetedPart = GetTargetedBodyPart();
 	
+	UE_LOG(LogTemp, Warning, TEXT("Slash: Found %d targets in range"), Targets.Num());
+	
 	for (AActor* Target : Targets)
 	{
 		ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(Target);
-		if (!Enemy)
+		if (!Enemy || Enemy->IsDead())
 		{
 			continue;
 		}
@@ -78,8 +86,13 @@ void USlashAbilityComponent::PerformSlash()
 			UEnemyAttributeComponent* EnemyAttributes = Enemy->FindComponentByClass<UEnemyAttributeComponent>();
 			if (EnemyAttributes)
 			{
+				UE_LOG(LogTemp, Warning, TEXT("Slash dealing %f damage to enemy with %f HP"), SlashDamage, EnemyAttributes->GetIntegrity());
 				EnemyAttributes->TakeDamage(SlashDamage);
-				UE_LOG(LogTemp, Warning, TEXT("Slash hit enemy for %f damage!"), SlashDamage);
+				UE_LOG(LogTemp, Warning, TEXT("Slash hit enemy for %f damage! Enemy HP now: %f"), SlashDamage, EnemyAttributes->GetIntegrity());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("Enemy has no EnemyAttributeComponent!"));
 			}
 		}
 	}

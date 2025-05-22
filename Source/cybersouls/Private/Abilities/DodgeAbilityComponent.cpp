@@ -1,5 +1,6 @@
 // DodgeAbilityComponent.cpp
 #include "cybersouls/Public/Abilities/DodgeAbilityComponent.h"
+#include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/Engine.h"
@@ -20,6 +21,15 @@ void UDodgeAbilityComponent::BeginPlay()
 
 bool UDodgeAbilityComponent::TryDodge(EBodyPart AttackedBodyPart, AActor* Attacker)
 {
+	// Check if owner is dead
+	if (ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(GetOwner()))
+	{
+		if (Enemy->IsDead())
+		{
+			return false;
+		}
+	}
+	
 	if (CanDodge(AttackedBodyPart) && CurrentDodgeCharges > 0)
 	{
 		ConsumeDodgeCharge();

@@ -33,8 +33,8 @@ void ACybersoulsBlockEnemy::InitializeEnemy()
 	// Block enemy specific initialization
 	if (EnemyAttributes)
 	{
-		EnemyAttributes->Integrity = 1.0f; // Dies in one hit if not blocked
-		EnemyAttributes->MaxIntegrity = 1.0f;
+		EnemyAttributes->Integrity = 100.0f; // 100 HP
+		EnemyAttributes->MaxIntegrity = 100.0f;
 	}
 	
 	if (AttackAbility)
@@ -53,6 +53,6 @@ void ACybersoulsBlockEnemy::InitializeEnemy()
 
 void ACybersoulsBlockEnemy::OnEnemyDeath()
 {
-	// Handle death
-	Destroy();
+	// Use base class death handling
+	OnDeath();
 }

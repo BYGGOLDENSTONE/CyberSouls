@@ -7,6 +7,7 @@
 #include "cybersouls/Public/Attributes/HackingEnemyAttributeComponent.h"
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
 #include "NavigationSystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "DrawDebugHelpers.h"
@@ -56,7 +57,7 @@ void AHackingEnemyAIController::Tick(float DeltaTime)
 
 void AHackingEnemyAIController::UpdateHackingBehavior()
 {
-	if (!ControlledEnemy || !PlayerTarget)
+	if (!ControlledEnemy || !PlayerTarget || ControlledEnemy->IsDead())
 	{
 		return;
 	}
@@ -165,7 +166,7 @@ void AHackingEnemyAIController::MaintainDistance()
 
 void AHackingEnemyAIController::PerformHacking()
 {
-	if (!ControlledEnemy || !PlayerTarget)
+	if (!ControlledEnemy || !PlayerTarget || ControlledEnemy->IsDead())
 	{
 		return;
 	}
@@ -180,7 +181,7 @@ void AHackingEnemyAIController::PerformHacking()
 
 void AHackingEnemyAIController::AttemptQuickHack()
 {
-	if (!ControlledEnemy || !PlayerTarget)
+	if (!ControlledEnemy || !PlayerTarget || ControlledEnemy->IsDead())
 	{
 		return;
 	}

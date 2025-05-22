@@ -6,9 +6,9 @@ UEnemyAttributeComponent::UEnemyAttributeComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	
-	// Most enemies die in one hit
-	Integrity = 1.0f;
-	MaxIntegrity = 1.0f;
+	// Enemies have 100 HP
+	Integrity = 100.0f;
+	MaxIntegrity = 100.0f;
 }
 
 void UEnemyAttributeComponent::BeginPlay()

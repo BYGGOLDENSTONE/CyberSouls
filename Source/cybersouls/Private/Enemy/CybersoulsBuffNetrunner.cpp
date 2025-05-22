@@ -42,15 +42,15 @@ void ACybersoulsBuffNetrunner::InitializeEnemy()
 	// BuffNetrunner specific initialization
 	if (EnemyAttributes)
 	{
-		EnemyAttributes->Integrity = 1.0f; // Dies in one hit
-		EnemyAttributes->MaxIntegrity = 1.0f;
+		EnemyAttributes->Integrity = 100.0f; // Dies in one hit
+		EnemyAttributes->MaxIntegrity = 100.0f;
 		EnemyAttributes->bHasQuickHacks = true; // This enemy has QuickHack abilities
 		EnemyAttributes->QuickHackChance = 0.3f; // 30% chance to use QuickHack when available
 	}
 	
 	if (HackAbility)
 	{
-		HackAbility->HackRate = 1.5f;
+		HackAbility->HackRate = 3.0f; // BuffNetrunner: 3 hackprogress per second
 		HackAbility->HackRange = 1500.0f;
 	}
 	
@@ -74,6 +74,6 @@ void ACybersoulsBuffNetrunner::TickActor(float DeltaTime, ELevelTick TickType, F
 
 void ACybersoulsBuffNetrunner::OnEnemyDeath()
 {
-	// Handle death
-	Destroy();
+	// Use base class death handling
+	OnDeath();
 }

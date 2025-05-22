@@ -74,9 +74,15 @@ class AcybersoulsCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* QuickHack3Action;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* QuickHack4Action;
+
 	/** Game system components */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
 	class UPlayerAttributeComponent* PlayerAttributes;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
+	class UPlayerProgressionComponent* PlayerProgression;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
 	class USlashAbilityComponent* SlashAbility;
@@ -89,6 +95,9 @@ class AcybersoulsCharacter : public ACharacter
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
 	class UQuickHackComponent* FirewallAbility;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
+	class UQuickHackComponent* KillAbility;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
 	UTargetLockComponent* TargetLockComponent;
@@ -119,6 +128,7 @@ protected:
 	void UseQuickHack1();
 	void UseQuickHack2();
 	void UseQuickHack3();
+	void UseQuickHack4();
 
 	/** Target part change with mouse movement */
 	void UpdateTargetPart(const FInputActionValue& Value);
@@ -147,6 +157,8 @@ public:
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 	/** Returns PlayerAttributes subobject **/
 	FORCEINLINE class UPlayerAttributeComponent* GetPlayerAttributes() const { return PlayerAttributes; }
+	/** Returns PlayerProgression subobject **/
+	FORCEINLINE class UPlayerProgressionComponent* GetPlayerProgression() const { return PlayerProgression; }
 	/** Returns SlashAbility subobject **/
 	FORCEINLINE class USlashAbilityComponent* GetSlashAbility() const { return SlashAbility; }
 	/** Returns InterruptProtocolAbility subobject **/
@@ -155,6 +167,8 @@ public:
 	FORCEINLINE class UQuickHackComponent* GetSystemFreezeAbility() const { return SystemFreezeAbility; }
 	/** Returns FirewallAbility subobject **/
 	FORCEINLINE class UQuickHackComponent* GetFirewallAbility() const { return FirewallAbility; }
+	/** Returns KillAbility subobject **/
+	FORCEINLINE class UQuickHackComponent* GetKillAbility() const { return KillAbility; }
 	/** Returns TargetLockComponent subobject **/
 	FORCEINLINE class UTargetLockComponent* GetTargetLockComponent() const { return TargetLockComponent; }
 

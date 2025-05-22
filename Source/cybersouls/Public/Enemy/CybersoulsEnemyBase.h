@@ -55,11 +55,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	virtual void OnReceivedDamage(float Damage, EBodyPart HitPart);
 
+	// Check if enemy is dead
+	bool IsDead() const { return bIsDead; }
+
 protected:
 	virtual void BeginPlay() override;
 	
 	UFUNCTION()
 	void OnDeath();
+
+	// Handle ragdoll death sequence
+	virtual void StartDeathSequence();
 
 	// Default AI Controller class to use
 	virtual TSubclassOf<AController> GetDefaultControllerClass() const;
@@ -74,10 +80,14 @@ protected:
 	
 	// Helper functions
 	bool IsTargetInRange(AActor* Target, float Range) const;
+
+	// Track death state
+	bool bIsDead = false;
 	
 private:
 	FTimerHandle AttackTimerHandle;
 	FTimerHandle HackTimerHandle;
+	FTimerHandle DeathTimerHandle;
 	
 	// Timer callbacks
 	void OnAttackTimer();

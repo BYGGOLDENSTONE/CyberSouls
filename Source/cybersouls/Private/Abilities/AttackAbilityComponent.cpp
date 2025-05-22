@@ -5,6 +5,7 @@
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
 
 UAttackAbilityComponent::UAttackAbilityComponent()
 {

@@ -33,8 +33,8 @@ void ACybersoulsDodgeEnemy::InitializeEnemy()
 	// Dodge enemy specific initialization
 	if (EnemyAttributes)
 	{
-		EnemyAttributes->Integrity = 1.0f; // Dies in one hit if not dodged
-		EnemyAttributes->MaxIntegrity = 1.0f;
+		EnemyAttributes->Integrity = 100.0f; // Dies in one hit if not dodged
+		EnemyAttributes->MaxIntegrity = 100.0f;
 	}
 	
 	if (AttackAbility)
@@ -55,6 +55,6 @@ void ACybersoulsDodgeEnemy::InitializeEnemy()
 
 void ACybersoulsDodgeEnemy::OnEnemyDeath()
 {
-	// Handle death
-	Destroy();
+	// Use base class death handling
+	OnDeath();
 }
