@@ -1,6 +1,7 @@
 // HackAbilityComponent.cpp
 #include "cybersouls/Public/Abilities/HackAbilityComponent.h"
 #include "cybersouls/Public/Attributes/PlayerAttributeComponent.h"
+#include "cybersouls/Public/Attributes/HackingEnemyAttributeComponent.h"
 #include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
@@ -68,10 +69,11 @@ void UHackAbilityComponent::PerformContinuousHack(float DeltaTime)
 	UPlayerAttributeComponent* PlayerAttributes = Target->FindComponentByClass<UPlayerAttributeComponent>();
 	if (PlayerAttributes)
 	{
-		PlayerAttributes->IncreaseHackProgress(HackRate * DeltaTime);
+		float HackAmount = GetHackRate() * DeltaTime;
+		PlayerAttributes->IncreaseHackProgress(HackAmount);
 		
 		UE_LOG(LogTemp, Verbose, TEXT("%s hacking player - Progress increased by %f"), 
-			*GetOwner()->GetName(), HackRate * DeltaTime);
+			*GetOwner()->GetName(), HackAmount);
 	}
 }
 
@@ -86,10 +88,41 @@ AActor* UHackAbilityComponent::GetTarget() const
 	
 	// Check range
 	float Distance = FVector::Dist(GetOwner()->GetActorLocation(), PlayerCharacter->GetActorLocation());
-	if (Distance <= HackRange)
+	if (Distance <= GetHackRange())
 	{
 		return PlayerCharacter;
 	}
 	
+	return nullptr;
+}
+
+float UHackAbilityComponent::GetHackRate() const
+{
+	UHackingEnemyAttributeComponent* EnemyAttributes = GetEnemyAttributes();
+	if (EnemyAttributes)
+	{
+		return EnemyAttributes->HackRate;
+	}
+	// Fallback to basic netrunner rate
+	return 2.0f;
+}
+
+float UHackAbilityComponent::GetHackRange() const
+{
+	UHackingEnemyAttributeComponent* EnemyAttributes = GetEnemyAttributes();
+	if (EnemyAttributes)
+	{
+		return EnemyAttributes->HackRange;
+	}
+	// Fallback to CLAUDE.md spec: 1500 hack range
+	return 1500.0f;
+}
+
+UHackingEnemyAttributeComponent* UHackAbilityComponent::GetEnemyAttributes() const
+{
+	if (GetOwner())
+	{
+		return GetOwner()->FindComponentByClass<UHackingEnemyAttributeComponent>();
+	}
 	return nullptr;
 }

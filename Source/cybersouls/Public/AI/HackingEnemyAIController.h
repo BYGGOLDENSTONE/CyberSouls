@@ -31,6 +31,9 @@ protected:
 	// Override visibility handling from base class
 	virtual void HandlePlayerVisibility() override;
 	virtual void HandlePlayerLostVisibility() override;
+	
+	// Override CanSeeTarget to respect Ghost Protocol
+	virtual bool CanSeeTarget(AActor* Target) const override;
 
 private:
 	// Range combat behavior parameters

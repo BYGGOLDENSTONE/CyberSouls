@@ -39,6 +39,9 @@ public:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")
 	bool bHasFirewall = false;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")
+	bool bIsInvisibleToHackers = false;
 
 	// Events
 	UPROPERTY(BlueprintAssignable)

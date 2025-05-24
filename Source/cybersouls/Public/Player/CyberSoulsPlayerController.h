@@ -12,6 +12,13 @@ class UCyberSoulsInputConfig;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCharacterSwitched, APawn*, NewCharacter);
 
+/**
+ * Main player controller for Cybersouls
+ * 
+ * Manages character switching between the default combat character
+ * and the CyberState mobility character. Handles input contexts
+ * and maintains both character instances throughout the game.
+ */
 UCLASS()
 class CYBERSOULS_API ACyberSoulsPlayerController : public APlayerController
 {
@@ -59,7 +66,24 @@ private:
     void SwitchToDefaultCharacter();
     void SwitchToCyberStateCharacter();
     void TransferCameraSettings(APawn* FromPawn, APawn* ToPawn);
+    void StoreCharacterState(APawn* CharacterPawn);
+    void RestoreCharacterState(APawn* CharacterPawn);
     
-    // Restart handling
+    // Character state preservation
+    struct FCharacterState
+    {
+        FVector Location;
+        FRotator Rotation;
+        FRotator CameraRotation;
+        // Add more state data as needed
+        bool bIsValid = false;
+    };
+    
+    FCharacterState DefaultCharacterState;
+    FCharacterState CyberStateCharacterState;
+    
+    // Input handling
     void HandleRestartInput();
+    void HandleShowXPInput();
+    void HandleOpenInventoryInput();
 };

@@ -28,6 +28,8 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Ability")
     void PerformAbility();
+    
+    void ResetJumpCount();
 
 protected:
     virtual void BeginPlay() override;
@@ -40,8 +42,6 @@ private:
     UPlayerCyberStateAttributeComponent* AttributeComponent;
 
     int32 CurrentJumpsInAir;
-    
-    void ResetJumpCount();
     
     UFUNCTION()
     void OnMovementModeChanged(class ACharacter* Character, EMovementMode PrevMovementMode, uint8 PreviousCustomMode);

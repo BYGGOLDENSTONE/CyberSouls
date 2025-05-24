@@ -35,16 +35,12 @@ void ACybersoulsNetrunner::InitializeEnemy()
 	Super::InitializeEnemy();
 	
 	// Netrunner specific initialization
-	if (EnemyAttributes)
+	if (UHackingEnemyAttributeComponent* HackingAttributes = Cast<UHackingEnemyAttributeComponent>(EnemyAttributes))
 	{
-		EnemyAttributes->Integrity = 100.0f; // Dies in one hit
-		EnemyAttributes->MaxIntegrity = 100.0f;
-	}
-	
-	if (HackAbility)
-	{
-		HackAbility->HackRate = 5.0f; // Netrunner: 5 hackprogress per second
-		HackAbility->HackRange = 1500.0f;
+		HackingAttributes->Integrity = 100.0f; // Dies in one hit
+		HackingAttributes->MaxIntegrity = 100.0f;
+		HackingAttributes->HackRate = 5.0f; // Netrunner: 5 hackprogress per second
+		HackingAttributes->HackRange = 1500.0f;
 	}
 }
 

@@ -15,6 +15,7 @@ class UInputAction;
 class UPlayerAttributeComponent;
 class USlashAbilityComponent;
 class UQuickHackComponent;
+class UQuickHackManagerComponent;
 class UTargetLockComponent;
 struct FInputActionValue;
 
@@ -86,16 +87,7 @@ class AcybersoulsCharacter : public ACharacter
 	class USlashAbilityComponent* SlashAbility;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
-	class UQuickHackComponent* InterruptProtocolAbility;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
-	class UQuickHackComponent* SystemFreezeAbility;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
-	class UQuickHackComponent* FirewallAbility;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
-	class UQuickHackComponent* KillAbility;
+	class UQuickHackManagerComponent* QuickHackManager;
 
 
 public:
@@ -138,6 +130,7 @@ public:
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	virtual void PossessedBy(AController* NewController) override;
 	
 	// To add mapping context
 	virtual void BeginPlay();
@@ -160,14 +153,8 @@ public:
 	FORCEINLINE class UPlayerProgressionComponent* GetPlayerProgression() const { return PlayerProgression; }
 	/** Returns SlashAbility subobject **/
 	FORCEINLINE class USlashAbilityComponent* GetSlashAbility() const { return SlashAbility; }
-	/** Returns InterruptProtocolAbility subobject **/
-	FORCEINLINE class UQuickHackComponent* GetInterruptProtocolAbility() const { return InterruptProtocolAbility; }
-	/** Returns SystemFreezeAbility subobject **/
-	FORCEINLINE class UQuickHackComponent* GetSystemFreezeAbility() const { return SystemFreezeAbility; }
-	/** Returns FirewallAbility subobject **/
-	FORCEINLINE class UQuickHackComponent* GetFirewallAbility() const { return FirewallAbility; }
-	/** Returns KillAbility subobject **/
-	FORCEINLINE class UQuickHackComponent* GetKillAbility() const { return KillAbility; }
+	/** Returns QuickHackManager subobject **/
+	FORCEINLINE class UQuickHackManagerComponent* GetQuickHackManager() const { return QuickHackManager; }
 
 private:
 	// Camera view state

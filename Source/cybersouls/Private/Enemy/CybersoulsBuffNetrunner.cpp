@@ -40,18 +40,14 @@ void ACybersoulsBuffNetrunner::InitializeEnemy()
 	Super::InitializeEnemy();
 	
 	// BuffNetrunner specific initialization
-	if (EnemyAttributes)
+	if (UHackingEnemyAttributeComponent* HackingAttributes = Cast<UHackingEnemyAttributeComponent>(EnemyAttributes))
 	{
-		EnemyAttributes->Integrity = 100.0f; // Dies in one hit
-		EnemyAttributes->MaxIntegrity = 100.0f;
-		EnemyAttributes->bHasQuickHacks = true; // This enemy has QuickHack abilities
-		EnemyAttributes->QuickHackChance = 0.3f; // 30% chance to use QuickHack when available
-	}
-	
-	if (HackAbility)
-	{
-		HackAbility->HackRate = 3.0f; // BuffNetrunner: 3 hackprogress per second
-		HackAbility->HackRange = 1500.0f;
+		HackingAttributes->Integrity = 100.0f; // Dies in one hit
+		HackingAttributes->MaxIntegrity = 100.0f;
+		HackingAttributes->bHasQuickHacks = true; // This enemy has QuickHack abilities
+		HackingAttributes->QuickHackChance = 0.3f; // 30% chance to use QuickHack when available
+		HackingAttributes->HackRate = 3.0f; // BuffNetrunner: 3 hackprogress per second
+		HackingAttributes->HackRange = 1500.0f;
 	}
 	
 	if (FirewallAbility)

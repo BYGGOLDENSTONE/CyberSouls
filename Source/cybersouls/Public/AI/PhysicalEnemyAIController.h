@@ -23,9 +23,6 @@ protected:
 private:
 	// Close combat behavior parameters
 	UPROPERTY(EditDefaultsOnly, Category = "AI")
-	float AttackRange = 300.0f;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "AI")
 	float ChaseSpeed = 400.0f;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "AI")
@@ -39,6 +36,11 @@ private:
 	bool bIsSearching = false;
 	float SearchTimeRemaining = 0.0f;
 	const float MaxSearchTime = 5.0f; // Search for 5 seconds before giving up
+	
+	// Tracking state
+	bool bHasSeenPlayer = false;
+	float LastSeenTime = 0.0f;
+	const float SearchTime = 5.0f;
 	
 	// Alert handling
 	bool bIsAlerted = false; // Whether this enemy has been alerted by another

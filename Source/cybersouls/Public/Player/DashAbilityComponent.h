@@ -6,6 +6,13 @@
 
 class UPlayerCyberStateAttributeComponent;
 
+/**
+ * Dash ability component for CyberState character
+ * 
+ * Provides a quick dash movement ability that consumes stamina.
+ * The dash moves the character rapidly in the input direction
+ * or forward if no input is provided.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class CYBERSOULS_API UDashAbilityComponent : public UActorComponent
 {
@@ -29,11 +36,50 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability")
     bool bCanDashInAir = true;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Charges")
+    int32 MaxCharges = 1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Charges")
+    float ChargeRegenTime = 3.0f;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Charges")
+    int32 CurrentCharges;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Charges")
+    float ChargeRegenTimer;
+    
+    UPROPERTY(BlueprintReadOnly, Category = "Ability")
+    float CooldownTimeRemaining;
+
+    /**
+     * Check if the dash ability can be performed
+     * 
+     * Validates stamina requirements, cooldown status, and air dash permissions.
+     * 
+     * @return True if all conditions are met for dashing
+     */
     UFUNCTION(BlueprintCallable, Category = "Ability")
     bool CanPerformAbility() const;
 
+    /**
+     * Execute the dash ability
+     * 
+     * Consumes stamina and initiates the dash movement if conditions are met.
+     * The dash direction is based on current movement input or facing direction.
+     */
     UFUNCTION(BlueprintCallable, Category = "Ability")
     void PerformAbility();
+
+    UFUNCTION(BlueprintCallable, Category = "Charges")
+    int32 GetCurrentCharges() const { return CurrentCharges; }
+
+    UFUNCTION(BlueprintCallable, Category = "Charges")
+    int32 GetMaxCharges() const { return MaxCharges; }
+
+    UFUNCTION(BlueprintCallable, Category = "Charges")
+    float GetChargeRegenProgress() const { return ChargeRegenTimer / ChargeRegenTime; }
+
+    void ResetCharges();
 
 protected:
     virtual void BeginPlay() override;
@@ -48,11 +94,23 @@ private:
 
     bool bIsDashing;
     float DashTimeRemaining;
-    float CooldownTimeRemaining;
     FVector DashDirection;
     FVector OriginalVelocity;
 
+    /**
+     * Initialize dash state and calculate direction
+     */
     void StartDash();
+    
+    /**
+     * Update dash movement each frame while dashing
+     * 
+     * @param DeltaTime Time since last update
+     */
     void UpdateDash(float DeltaTime);
+    
+    /**
+     * Clean up dash state and apply exit velocity
+     */
     void EndDash();
 };

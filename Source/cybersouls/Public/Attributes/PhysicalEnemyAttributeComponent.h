@@ -16,16 +16,6 @@ class CYBERSOULS_API UPhysicalEnemyAttributeComponent : public UEnemyAttributeCo
 public:
 	UPhysicalEnemyAttributeComponent();
 
-	// Physical enemy specific stats
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
-	float AttackDamage = 1.0f;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
-	float AttackSpeed = 2.0f; // Attacks per second
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
-	float AttackRange = 300.0f;
-
 	// Additional events specific to physical enemies
 	UPROPERTY(BlueprintAssignable)
 	FOnPhysicalEnemyDeath OnPhysicalDeath;

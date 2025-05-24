@@ -1,6 +1,7 @@
 #include "cybersouls/Public/AI/BaseEnemyAIController.h"
 #include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "cybersouls/Public/Character/cybersoulsCharacter.h"
+#include "cybersouls/Public/Attributes/PlayerAttributeComponent.h"
 #include "cybersouls/Public/CybersoulsUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
@@ -9,7 +10,8 @@
 
 ABaseEnemyAIController::ABaseEnemyAIController()
 {
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.TickInterval = 0.1f; // Tick every 0.1 seconds for performance
 }
 
 void ABaseEnemyAIController::BeginPlay()
@@ -21,6 +23,17 @@ void ABaseEnemyAIController::OnPossess(APawn* InPawn)
 {
     Super::OnPossess(InPawn);
     ControlledEnemy = Cast<ACybersoulsEnemyBase>(InPawn);
+    
+    // Initialize player target
+    PlayerTarget = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
+    if (PlayerTarget)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("BaseEnemyAI: Found player target for %s"), InPawn ? *InPawn->GetName() : TEXT("Unknown"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("BaseEnemyAI: Failed to find player target for %s"), InPawn ? *InPawn->GetName() : TEXT("Unknown"));
+    }
 }
 
 void ABaseEnemyAIController::OnUnPossess()

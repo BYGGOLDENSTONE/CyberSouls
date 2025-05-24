@@ -37,16 +37,37 @@ void APlayerCyberState::BeginPlay()
 {
     Super::BeginPlay();
     
-    // Add Input Mapping Context
-    if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
+    // Input mapping context will be added when possessed, not in BeginPlay
+    // This prevents context conflicts during character switching
+}
+
+void APlayerCyberState::PossessedBy(AController* NewController)
+{
+    Super::PossessedBy(NewController);
+    
+    // Add Input Mapping Context when possessed
+    if (APlayerController* PlayerController = Cast<APlayerController>(NewController))
     {
         if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
         {
             if (CyberStateMappingContext)
             {
+                UE_LOG(LogTemp, Warning, TEXT("PlayerCyberState: Adding CyberStateMappingContext on possession"));
                 Subsystem->AddMappingContext(CyberStateMappingContext, 0);
             }
         }
+    }
+    
+    // Reset double jump count when possessed
+    if (DoubleJumpComponent)
+    {
+        DoubleJumpComponent->ResetJumpCount();
+    }
+    
+    // Reset dash charges when possessed
+    if (DashComponent)
+    {
+        DashComponent->ResetCharges();
     }
 }
 
@@ -59,7 +80,7 @@ void APlayerCyberState::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         // Jumping - using double jump component
         if (JumpAction)
         {
-            EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &APlayerCyberState::TryJump);
+            EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &APlayerCyberState::TryJump);
             EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
         }
 
@@ -84,7 +105,7 @@ void APlayerCyberState::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
         // Camera Toggle
         if (CameraToggleAction)
         {
-            // Camera toggle can be handled if needed
+            EnhancedInputComponent->BindAction(CameraToggleAction, ETriggerEvent::Triggered, this, &APlayerCyberState::ToggleCameraView);
         }
 
         // Character Switch
@@ -171,5 +192,32 @@ void APlayerCyberState::OnSwitchCharacter()
     if (ACyberSoulsPlayerController* CyberController = Cast<ACyberSoulsPlayerController>(GetController()))
     {
         CyberController->SwitchCharacter();
+    }
+}
+
+void APlayerCyberState::ToggleCameraView()
+{
+    if (USpringArmComponent* SpringArm = FindComponentByClass<USpringArmComponent>())
+    {
+        if (bIsThirdPersonView)
+        {
+            // Switch to first person view
+            SpringArm->TargetArmLength = 0.0f;
+            SpringArm->bUsePawnControlRotation = true;
+            SpringArm->SocketOffset = FVector(0.0f, 0.0f, 60.0f); // Eye level height
+            bIsThirdPersonView = false;
+            
+            UE_LOG(LogTemp, Warning, TEXT("Switched to First Person View"));
+        }
+        else
+        {
+            // Switch to third person view
+            SpringArm->TargetArmLength = 400.0f;
+            SpringArm->bUsePawnControlRotation = true;
+            SpringArm->SocketOffset = FVector(0.0f, 0.0f, 0.0f);
+            bIsThirdPersonView = true;
+            
+            UE_LOG(LogTemp, Warning, TEXT("Switched to Third Person View"));
+        }
     }
 }

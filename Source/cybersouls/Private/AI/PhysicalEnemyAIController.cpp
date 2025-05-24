@@ -17,7 +17,6 @@ APhysicalEnemyAIController::APhysicalEnemyAIController()
 	PrimaryActorTick.bCanEverTick = true;
 	
 	// Default values for close combat
-	AttackRange = 150.0f;      // Closer attack range
 	ChaseSpeed = 600.0f;       // Faster chase speed
 	AcceptanceRadius = 80.0f;  // Stop closer to player
 }
@@ -49,15 +48,101 @@ void APhysicalEnemyAIController::BeginPlay()
 	}
 }
 
+void APhysicalEnemyAIController::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	
+	static int TickCounter = 0;
+	TickCounter++;
+	
+	// Log every 30 ticks (roughly every 3 seconds at 0.1s tick interval)
+	if (TickCounter % 30 == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("PhysicalEnemyAI Tick: Enemy=%s, PlayerTarget=%s, Pawn=%s"), 
+			ControlledEnemy ? *ControlledEnemy->GetName() : TEXT("NULL"),
+			PlayerTarget ? *PlayerTarget->GetName() : TEXT("NULL"),
+			GetPawn() ? *GetPawn()->GetName() : TEXT("NULL"));
+	}
+	
+	if (!IsValid(PlayerTarget) || !IsValid(GetPawn()))
+	{
+		return;
+	}
+	
+	// Check if we can see the player
+	if (CanSeeTarget(PlayerTarget))
+	{
+		bHasSeenPlayer = true;
+		LastKnownPlayerLocation = PlayerTarget->GetActorLocation();
+		LastSeenTime = GetWorld()->GetTimeSeconds();
+		
+		// Alert nearby allies
+		AlertNearbyEnemies(PlayerTarget);
+		
+		// Check distance to player
+		float DistanceToPlayer = FVector::Distance(GetPawn()->GetActorLocation(), PlayerTarget->GetActorLocation());
+		
+		// Log when we first see the player
+		static bool bWasVisible = false;
+		if (!bWasVisible)
+		{
+			float ActualAttackRange = 150.0f; // Default
+			if (ControlledEnemy)
+			{
+				UAttackAbilityComponent* AttackComponent = ControlledEnemy->FindComponentByClass<UAttackAbilityComponent>();
+				if (AttackComponent)
+				{
+					ActualAttackRange = AttackComponent->GetAttackRange();
+				}
+			}
+			UE_LOG(LogTemp, Warning, TEXT("PhysicalEnemyAI: %s spotted player at distance %.1f (AttackRange=%.1f)"), 
+				*GetPawn()->GetName(), DistanceToPlayer, ActualAttackRange);
+		}
+		bWasVisible = true;
+		
+		if (IsInAttackRange())
+		{
+			// Stop moving and attack
+			StopMovement();
+			PerformAttack();
+		}
+		else
+		{
+			// Chase the player
+			MoveToLocation(PlayerTarget->GetActorLocation());
+		}
+	}
+	else if (bHasSeenPlayer)
+	{
+		// Lost sight of player, search last known location
+		float TimeSinceSeen = GetWorld()->GetTimeSeconds() - LastSeenTime;
+		if (TimeSinceSeen < SearchTime)
+		{
+			// Move to last known location
+			MoveToLocation(LastKnownPlayerLocation);
+		}
+		else
+		{
+			// Give up searching
+			bHasSeenPlayer = false;
+			StopMovement();
+		}
+	}
+}
+
 void APhysicalEnemyAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 	
+	UE_LOG(LogTemp, Warning, TEXT("PhysicalEnemyAIController::OnPossess called for pawn: %s"), InPawn ? *InPawn->GetName() : TEXT("NULL"));
+	
 	if (!ControlledEnemy)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("PhysicalEnemyAIController possessed non-enemy pawn!"));
+		UE_LOG(LogTemp, Error, TEXT("PhysicalEnemyAIController possessed non-enemy pawn!"));
 		return;
 	}
+	
+	UE_LOG(LogTemp, Warning, TEXT("PhysicalEnemyAI: Successfully possessed enemy %s"), *ControlledEnemy->GetName());
 	
 	// Set movement speed
 	if (ControlledEnemy->GetCharacterMovement())
@@ -65,17 +150,41 @@ void APhysicalEnemyAIController::OnPossess(APawn* InPawn)
 		ControlledEnemy->GetCharacterMovement()->MaxWalkSpeed = ChaseSpeed;
 		UE_LOG(LogTemp, Warning, TEXT("PhysicalEnemyAI: Set movement speed to %.1f for %s"), ChaseSpeed, *ControlledEnemy->GetName());
 	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("PhysicalEnemyAI: No movement component found for %s"), *ControlledEnemy->GetName());
+	}
 	
 	// Setup path following for smoother movement
 	if (UPathFollowingComponent* PathFollowing = GetPathFollowingComponent())
 	{
 		PathFollowing->OnRequestFinished.AddUObject(this, &APhysicalEnemyAIController::OnMoveCompleted);
+		UE_LOG(LogTemp, Warning, TEXT("PhysicalEnemyAI: Path following component setup complete"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("PhysicalEnemyAI: No path following component found"));
 	}
 	
-	// Start pursuing player immediately if visible
-	if (PlayerTarget && CanSeeTarget(PlayerTarget))
+	// Log player target status
+	if (PlayerTarget)
 	{
-		MoveToTarget();
+		UE_LOG(LogTemp, Warning, TEXT("PhysicalEnemyAI: Player target found: %s"), *PlayerTarget->GetName());
+		
+		// Start pursuing player immediately if visible
+		if (CanSeeTarget(PlayerTarget))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("PhysicalEnemyAI: Can see player, starting movement"));
+			MoveToTarget();
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("PhysicalEnemyAI: Cannot see player initially"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("PhysicalEnemyAI: No player target found!"));
 	}
 }
 
@@ -87,20 +196,6 @@ void APhysicalEnemyAIController::OnUnPossess()
 	Super::OnUnPossess();
 }
 
-void APhysicalEnemyAIController::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-	
-	// Update search behavior if searching
-	if (bIsSearching)
-	{
-		UpdateSearchBehavior(DeltaTime);
-	}
-	else
-	{
-		UpdateCombatBehavior();
-	}
-}
 
 void APhysicalEnemyAIController::UpdateCombatBehavior()
 {
@@ -109,11 +204,7 @@ void APhysicalEnemyAIController::UpdateCombatBehavior()
 		return;
 	}
 	
-	// Always update player target in case it changed
-	if (!PlayerTarget)
-	{
-		PlayerTarget = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
-	}
+	// Player target is set in base class OnPossess
 	
 	// Check if player is in sight
 	if (CanSeeTarget(PlayerTarget))
@@ -232,13 +323,23 @@ void APhysicalEnemyAIController::PerformAttack()
 		AttackAbility->ActivateAbility();
 		
 		// Set attack timer based on attack cooldown
-		GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &APhysicalEnemyAIController::PerformAttack, AttackAbility->AttackCooldown, false);
+		GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &APhysicalEnemyAIController::PerformAttack, AttackAbility->GetAttackCooldown(), false);
 	}
 }
 
 bool APhysicalEnemyAIController::IsInAttackRange() const
 {
-	return GetDistanceToTarget(PlayerTarget) <= AttackRange;
+	// Use the same attack range as the AttackAbilityComponent
+	if (ControlledEnemy)
+	{
+		UAttackAbilityComponent* AttackComponent = ControlledEnemy->FindComponentByClass<UAttackAbilityComponent>();
+		if (AttackComponent)
+		{
+			return GetDistanceToTarget(PlayerTarget) <= AttackComponent->GetAttackRange();
+		}
+	}
+	// Fallback to hardcoded value
+	return GetDistanceToTarget(PlayerTarget) <= 150.0f;
 }
 
 void APhysicalEnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)

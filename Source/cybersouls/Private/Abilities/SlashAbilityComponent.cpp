@@ -3,6 +3,7 @@
 #include "cybersouls/Public/Character/cybersoulsCharacter.h"
 #include "cybersouls/Public/Abilities/BlockAbilityComponent.h"
 #include "cybersouls/Public/Abilities/DodgeAbilityComponent.h"
+#include "cybersouls/Public/Abilities/PassiveAbilityComponent.h"
 #include "cybersouls/Public/Attributes/EnemyAttributeComponent.h"
 #include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "Engine/World.h"
@@ -61,16 +62,24 @@ void USlashAbilityComponent::PerformSlash()
 		bool bWasBlocked = false;
 		bool bWasDodged = false;
 		
-		// Check for block ability
-		UBlockAbilityComponent* BlockComp = Enemy->FindComponentByClass<UBlockAbilityComponent>();
-		if (BlockComp && BlockComp->TryBlock(TargetedPart))
+		// Check for passive abilities that might bypass defenses
+		UPassiveAbilityComponent* PassiveComp = GetOwner()->FindComponentByClass<UPassiveAbilityComponent>();
+		bool bIgnoreBlock = PassiveComp ? PassiveComp->ShouldIgnoreBlock() : false;
+		bool bIgnoreAllDefenses = PassiveComp ? PassiveComp->ShouldIgnoreAllDefenses() : false;
+		
+		// Check for block ability (unless bypassed by passive)
+		if (!bIgnoreBlock && !bIgnoreAllDefenses)
 		{
-			bWasBlocked = true;
-			UE_LOG(LogTemp, Warning, TEXT("Enemy blocked slash!"));
+			UBlockAbilityComponent* BlockComp = Enemy->FindComponentByClass<UBlockAbilityComponent>();
+			if (BlockComp && BlockComp->TryBlock(TargetedPart))
+			{
+				bWasBlocked = true;
+				UE_LOG(LogTemp, Warning, TEXT("Enemy blocked slash!"));
+			}
 		}
 		
-		// Check for dodge ability if not blocked
-		if (!bWasBlocked)
+		// Check for dodge ability if not blocked (unless bypassed by passive)
+		if (!bWasBlocked && !bIgnoreAllDefenses)
 		{
 			UDodgeAbilityComponent* DodgeComp = Enemy->FindComponentByClass<UDodgeAbilityComponent>();
 			if (DodgeComp && DodgeComp->TryDodge(TargetedPart, GetOwner()))
@@ -86,8 +95,17 @@ void USlashAbilityComponent::PerformSlash()
 			UEnemyAttributeComponent* EnemyAttributes = Enemy->FindComponentByClass<UEnemyAttributeComponent>();
 			if (EnemyAttributes)
 			{
+				bool bWasAlive = EnemyAttributes->GetIntegrity() > 0.0f;
 				UE_LOG(LogTemp, Warning, TEXT("Slash dealing %f damage to enemy with %f HP"), SlashDamage, EnemyAttributes->GetIntegrity());
 				EnemyAttributes->TakeDamage(SlashDamage);
+				
+				// Check if enemy was killed and notify passive abilities
+				bool bWasKilled = bWasAlive && (EnemyAttributes->GetIntegrity() <= 0.0f);
+				if (bWasKilled && PassiveComp)
+				{
+					PassiveComp->OnEnemyKilled();
+				}
+				
 				UE_LOG(LogTemp, Warning, TEXT("Slash hit enemy for %f damage! Enemy HP now: %f"), SlashDamage, EnemyAttributes->GetIntegrity());
 			}
 			else

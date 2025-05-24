@@ -5,6 +5,7 @@
 #include "cybersouls/Public/Abilities/HackAbilityComponent.h"
 #include "cybersouls/Public/Abilities/QuickHackComponent.h"
 #include "cybersouls/Public/Attributes/HackingEnemyAttributeComponent.h"
+#include "cybersouls/Public/Attributes/PlayerAttributeComponent.h"
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
@@ -149,7 +150,17 @@ void AHackingEnemyAIController::AttemptQuickHack()
 
 bool AHackingEnemyAIController::IsInHackRange() const
 {
-	return GetDistanceToTarget(PlayerTarget) <= HackRange;
+	// Use the same hack range as the HackAbilityComponent
+	if (ControlledEnemy)
+	{
+		UHackAbilityComponent* HackComponent = ControlledEnemy->FindComponentByClass<UHackAbilityComponent>();
+		if (HackComponent)
+		{
+			return GetDistanceToTarget(PlayerTarget) <= HackComponent->GetHackRange();
+		}
+	}
+	// Fallback to hardcoded value
+	return GetDistanceToTarget(PlayerTarget) <= 1500.0f;
 }
 
 bool AHackingEnemyAIController::IsPlayerCastingQuickHack() const
@@ -303,5 +314,21 @@ void AHackingEnemyAIController::HandlePlayerLostVisibility()
 {
 	// Stop alerting when we lose sight
 	StopAlertingAllies();
+}
+
+bool AHackingEnemyAIController::CanSeeTarget(AActor* Target) const
+{
+	// Check for Ghost Protocol invisibility first
+	if (Target)
+	{
+		UPlayerAttributeComponent* PlayerAttributes = Target->FindComponentByClass<UPlayerAttributeComponent>();
+		if (PlayerAttributes && PlayerAttributes->bIsInvisibleToHackers)
+		{
+			return false; // Player is invisible to hack enemies
+		}
+	}
+	
+	// Otherwise use base class implementation for line of sight
+	return Super::CanSeeTarget(Target);
 }
 

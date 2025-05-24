@@ -42,18 +42,14 @@ void ACybersoulsDebuffNetrunner::InitializeEnemy()
 	Super::InitializeEnemy();
 	
 	// DebuffNetrunner specific initialization
-	if (EnemyAttributes)
+	if (UHackingEnemyAttributeComponent* HackingAttributes = Cast<UHackingEnemyAttributeComponent>(EnemyAttributes))
 	{
-		EnemyAttributes->Integrity = 100.0f; // Dies in one hit
-		EnemyAttributes->MaxIntegrity = 100.0f;
-		EnemyAttributes->bHasQuickHacks = true; // This enemy has QuickHack abilities
-		EnemyAttributes->QuickHackChance = 0.4f; // 40% chance to use QuickHack when available
-	}
-	
-	if (HackAbility)
-	{
-		HackAbility->HackRate = 2.0f; // DebuffNetrunner: 2 hackprogress per second
-		HackAbility->HackRange = 1500.0f;
+		HackingAttributes->Integrity = 100.0f; // Dies in one hit
+		HackingAttributes->MaxIntegrity = 100.0f;
+		HackingAttributes->bHasQuickHacks = true; // This enemy has QuickHack abilities
+		HackingAttributes->QuickHackChance = 0.4f; // 40% chance to use QuickHack when available
+		HackingAttributes->HackRate = 2.0f; // DebuffNetrunner: 2 hackprogress per second
+		HackingAttributes->HackRange = 1500.0f;
 	}
 	
 	if (SystemFreezeAbility)

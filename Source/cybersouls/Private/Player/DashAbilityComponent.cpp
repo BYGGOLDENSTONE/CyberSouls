@@ -4,6 +4,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Camera/CameraComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "GameFramework/PlayerController.h"
 
 UDashAbilityComponent::UDashAbilityComponent()
 {
@@ -11,6 +13,8 @@ UDashAbilityComponent::UDashAbilityComponent()
     bIsDashing = false;
     DashTimeRemaining = 0.0f;
     CooldownTimeRemaining = 0.0f;
+    CurrentCharges = 1;
+    ChargeRegenTimer = 0.0f;
 }
 
 void UDashAbilityComponent::BeginPlay()
@@ -22,26 +26,58 @@ void UDashAbilityComponent::BeginPlay()
     {
         AttributeComponent = OwnerCharacter->FindComponentByClass<UPlayerCyberStateAttributeComponent>();
     }
+    
+    // Initialize charges
+    CurrentCharges = MaxCharges;
+    ChargeRegenTimer = 0.0f;
 }
 
 void UDashAbilityComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-    if (CooldownTimeRemaining > 0.0f)
-    {
-        CooldownTimeRemaining -= DeltaTime;
-    }
-
     if (bIsDashing)
     {
         UpdateDash(DeltaTime);
+    }
+    
+    // Handle cooldown and charge regeneration
+    if (OwnerCharacter)
+    {
+        // Cooldown always continues regardless of position
+        if (CooldownTimeRemaining > 0.0f)
+        {
+            CooldownTimeRemaining -= DeltaTime;
+        }
+        
+        UCharacterMovementComponent* Movement = OwnerCharacter->GetCharacterMovement();
+        if (Movement && Movement->IsMovingOnGround())
+        {
+            // Handle charge regeneration only when on ground
+            if (CurrentCharges < MaxCharges)
+            {
+                ChargeRegenTimer += DeltaTime;
+                
+                if (ChargeRegenTimer >= ChargeRegenTime)
+                {
+                    CurrentCharges++;
+                    ChargeRegenTimer = 0.0f;
+                }
+            }
+        }
+        // When in air: charge regen pauses (timer maintains current value)
     }
 }
 
 bool UDashAbilityComponent::CanPerformAbility() const
 {
     if (!IsValid(OwnerCharacter) || !IsValid(AttributeComponent))
+    {
+        return false;
+    }
+
+    // Check if we have charges available
+    if (CurrentCharges <= 0)
     {
         return false;
     }
@@ -73,6 +109,9 @@ void UDashAbilityComponent::PerformAbility()
     }
 
     AttributeComponent->UseStamina(StaminaCost);
+    CurrentCharges--;
+    ChargeRegenTimer = 0.0f; // Reset regen timer when using a charge
+    
     StartDash();
 }
 
@@ -81,24 +120,53 @@ void UDashAbilityComponent::StartDash()
     bIsDashing = true;
     DashTimeRemaining = DashDuration;
     
-    FVector InputDirection = FVector::ZeroVector;
-    
-    // Get movement input direction from character's last movement input
-    UCharacterMovementComponent* Movement = OwnerCharacter->GetCharacterMovement();
-    if (Movement && !Movement->GetLastInputVector().IsNearlyZero())
-    {
-        InputDirection = Movement->GetLastInputVector().GetSafeNormal();
-    }
-    
-    if (InputDirection.IsNearlyZero())
+    // Get crosshair direction
+    APlayerController* PC = Cast<APlayerController>(OwnerCharacter->GetController());
+    if (!PC)
     {
         DashDirection = OwnerCharacter->GetActorForwardVector();
     }
     else
     {
-        DashDirection = InputDirection;
+        // Get camera location and direction
+        FVector CameraLocation = PC->PlayerCameraManager->GetCameraLocation();
+        FVector CameraForward = PC->PlayerCameraManager->GetCameraRotation().Vector();
+        
+        // Perform line trace from camera through crosshair
+        FVector TraceEnd = CameraLocation + (CameraForward * 10000.0f);
+        FHitResult HitResult;
+        FCollisionQueryParams TraceParams;
+        TraceParams.AddIgnoredActor(OwnerCharacter);
+        
+        bool bHit = GetWorld()->LineTraceSingleByChannel(
+            HitResult,
+            CameraLocation,
+            TraceEnd,
+            ECC_Visibility,
+            TraceParams
+        );
+        
+        // Calculate dash direction toward hit point or camera forward
+        FVector TargetPoint = bHit ? HitResult.Location : TraceEnd;
+        FVector DashVector = (TargetPoint - OwnerCharacter->GetActorLocation()).GetSafeNormal();
+        
+        UCharacterMovementComponent* Movement = OwnerCharacter->GetCharacterMovement();
+        if (Movement)
+        {
+            if (Movement->IsMovingOnGround())
+            {
+                // On ground: 2D dash (remove vertical component)
+                DashDirection = FVector(DashVector.X, DashVector.Y, 0.0f).GetSafeNormal();
+            }
+            else
+            {
+                // In air: 3D dash (full directional)
+                DashDirection = DashVector;
+            }
+        }
     }
     
+    UCharacterMovementComponent* Movement = OwnerCharacter->GetCharacterMovement();
     if (Movement)
     {
         OriginalVelocity = Movement->Velocity;
@@ -138,7 +206,20 @@ void UDashAbilityComponent::EndDash()
         Movement->SetMovementMode(MOVE_Falling);
         Movement->BrakingFrictionFactor = 2.0f;
         
-        Movement->Velocity = DashDirection * (DashDistance / DashDuration) * 0.3f;
-        Movement->Velocity.Z = FMath::Max(Movement->Velocity.Z, -500.0f);
+        // Maintain some momentum after dash
+        float EndSpeed = (DashDistance / DashDuration) * 0.3f;
+        Movement->Velocity = DashDirection * EndSpeed;
+        
+        // For air dashes, preserve some vertical momentum
+        if (!Movement->IsMovingOnGround())
+        {
+            Movement->Velocity.Z = FMath::Max(Movement->Velocity.Z, -500.0f);
+        }
     }
+}
+
+void UDashAbilityComponent::ResetCharges()
+{
+    CurrentCharges = MaxCharges;
+    ChargeRegenTimer = 0.0f;
 }

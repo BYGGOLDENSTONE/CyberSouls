@@ -12,7 +12,11 @@ enum class EQuickHackType : uint8
 	InterruptProtocol UMETA(DisplayName = "Interrupt Protocol"),
 	SystemFreeze UMETA(DisplayName = "System Freeze"),
 	Firewall UMETA(DisplayName = "Firewall"),
-	Kill UMETA(DisplayName = "Kill")
+	Kill UMETA(DisplayName = "Kill"),
+	CascadeVirus UMETA(DisplayName = "Cascade Virus"),
+	GhostProtocol UMETA(DisplayName = "Ghost Protocol"),
+	ChargeDrain UMETA(DisplayName = "Charge Drain"),
+	GravityFlip UMETA(DisplayName = "Gravity Flip")
 };
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -41,6 +45,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "QuickHack")
 	float Range = 1000.0f;
 
+	// Cascade Virus tracking
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "QuickHack")
+	TArray<AActor*> MarkedEnemies;
+
 	UFUNCTION(BlueprintCallable, Category = "QuickHack")
 	void StartQuickHack(AActor* Target = nullptr);
 	
@@ -50,12 +58,31 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "QuickHack")
 	bool IsQuickHackActive() const { return bIsAbilityActive; }
 	
+	UFUNCTION(BlueprintCallable, Category = "QuickHack")
+	void OnEnemyKilled(AActor* KilledEnemy);
+	
+	// Public methods for QuickHackManager
+	UFUNCTION(BlueprintCallable, Category = "QuickHack")
+	void SetQuickHackType(EQuickHackType InType) { QuickHackType = InType; }
+	
+	UFUNCTION(BlueprintCallable, Category = "QuickHack")
+	float GetCooldownRemaining() const { return CurrentCooldown; }
+	
+	UFUNCTION(BlueprintCallable, Category = "QuickHack")
+	float GetCastTimeRemaining() const { return CurrentCastTime; }
+	
+	UFUNCTION(BlueprintCallable, Category = "QuickHack")
+	bool IsCasting() const { return bIsAbilityActive && CurrentCastTime > 0.0f; }
+	
+	UFUNCTION(BlueprintCallable, Category = "QuickHack")
+	void CancelQuickHack() { InterruptQuickHack(); }
+	
 	virtual void ActivateAbility() override;
 	virtual bool CanActivateAbility() override;
-
-protected:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+protected:
 	
 private:
 	UPROPERTY()
@@ -63,4 +90,10 @@ private:
 	
 	void CompleteQuickHack();
 	void ApplyQuickHackEffect();
+	
+	// Cascade Virus helpers
+	void MarkEnemyForCascade(AActor* Enemy);
+	void RemoveMarkFromEnemy(AActor* Enemy);
+	void TriggerCascadeEffect(AActor* KilledEnemy);
+	TArray<AActor*> GetNearbyEnemies(AActor* CenterEnemy, float Radius = 800.0f);
 };

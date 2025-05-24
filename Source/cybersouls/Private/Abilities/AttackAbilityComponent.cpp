@@ -1,6 +1,7 @@
 // AttackAbilityComponent.cpp
 #include "cybersouls/Public/Abilities/AttackAbilityComponent.h"
 #include "cybersouls/Public/Attributes/PlayerAttributeComponent.h"
+#include "cybersouls/Public/Attributes/PhysicalEnemyAttributeComponent.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
@@ -10,15 +11,14 @@
 UAttackAbilityComponent::UAttackAbilityComponent()
 {
 	AbilityName = "Attack";
-	// Default values are set in header
 }
 
 void UAttackAbilityComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	// Set the ability cooldown
-	Cooldown = AttackCooldown;
+	// Set the ability cooldown from enemy attributes
+	Cooldown = GetAttackCooldown();
 }
 
 void UAttackAbilityComponent::ActivateAbility()
@@ -57,10 +57,11 @@ void UAttackAbilityComponent::PerformAttack()
 	UPlayerAttributeComponent* PlayerAttributes = Target->FindComponentByClass<UPlayerAttributeComponent>();
 	if (PlayerAttributes)
 	{
-		PlayerAttributes->TakeDamage(AttackDamage);
+		float Damage = GetAttackDamage();
+		PlayerAttributes->TakeDamage(Damage);
 		
 		UE_LOG(LogTemp, Warning, TEXT("%s attacked player for %f damage"), 
-			*GetOwner()->GetName(), AttackDamage);
+			*GetOwner()->GetName(), Damage);
 	}
 }
 
@@ -75,10 +76,37 @@ AActor* UAttackAbilityComponent::GetTarget() const
 	
 	// Check range
 	float Distance = FVector::Dist(GetOwner()->GetActorLocation(), PlayerCharacter->GetActorLocation());
-	if (Distance <= AttackRange)
+	if (Distance <= GetAttackRange())
 	{
 		return Cast<AActor>(PlayerCharacter);
 	}
 	
+	return nullptr;
+}
+
+float UAttackAbilityComponent::GetAttackDamage() const
+{
+	// Return the damage value from this component
+	return AttackDamage;
+}
+
+float UAttackAbilityComponent::GetAttackRange() const
+{
+	// Return the range value from this component
+	return AttackRange;
+}
+
+float UAttackAbilityComponent::GetAttackCooldown() const
+{
+	// Return the cooldown value from this component
+	return AttackCooldown;
+}
+
+UPhysicalEnemyAttributeComponent* UAttackAbilityComponent::GetEnemyAttributes() const
+{
+	if (GetOwner())
+	{
+		return GetOwner()->FindComponentByClass<UPhysicalEnemyAttributeComponent>();
+	}
 	return nullptr;
 }

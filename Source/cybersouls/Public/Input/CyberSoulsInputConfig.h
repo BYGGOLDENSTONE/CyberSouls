@@ -22,6 +22,12 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Common Input")
     UInputAction* RestartAction;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI Input")
+    UInputAction* ShowXPAction;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI Input")
+    UInputAction* OpenInventoryAction;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement Input")
     UInputAction* MoveAction;
 

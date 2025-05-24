@@ -3,6 +3,7 @@
 #include "cybersouls/Public/AI/PhysicalEnemyAIController.h"
 #include "cybersouls/Public/AI/HackingEnemyAIController.h"
 #include "cybersouls/Public/Game/cybersoulsGameMode.h"
+#include "cybersouls/Public/Abilities/QuickHackComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -156,6 +157,17 @@ void ACybersoulsEnemyBase::OnDeath()
 		if (AcybersoulsGameMode* CybersoulsGameMode = Cast<AcybersoulsGameMode>(GameMode))
 		{
 			CybersoulsGameMode->OnEnemyDeath(this);
+		}
+	}
+	
+	// Notify all QuickHackComponents about this enemy death for Cascade Virus
+	TArray<AActor*> FoundActors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), APawn::StaticClass(), FoundActors);
+	for (AActor* Actor : FoundActors)
+	{
+		if (UQuickHackComponent* QuickHackComp = Actor->FindComponentByClass<UQuickHackComponent>())
+		{
+			QuickHackComp->OnEnemyKilled(this);
 		}
 	}
 

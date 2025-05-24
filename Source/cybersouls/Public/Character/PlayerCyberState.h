@@ -11,6 +11,13 @@ class UDashAbilityComponent;
 class UInputMappingContext;
 class UInputAction;
 
+/**
+ * CyberState player character with enhanced mobility
+ * 
+ * Alternative playable character focused on movement abilities
+ * including double jump and dash. Uses stamina instead of
+ * integrity/hack progress as its primary resource.
+ */
 UCLASS()
 class CYBERSOULS_API APlayerCyberState : public ACharacter
 {
@@ -62,6 +69,7 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+    virtual void PossessedBy(AController* NewController) override;
 
 private:
     // Enhanced Input Actions
@@ -70,6 +78,10 @@ private:
     void TryJump();
     void TryDash();
     void OnSwitchCharacter();
+    void ToggleCameraView();
     
     void ConfigureEnhancedMovement();
+    
+    // Camera toggle state
+    bool bIsThirdPersonView = true;
 };

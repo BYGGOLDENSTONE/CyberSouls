@@ -6,8 +6,10 @@
 #include "cybersouls/Public/Attributes/PlayerAttributeComponent.h"
 #include "cybersouls/Public/Attributes/PlayerProgressionComponent.h"
 #include "cybersouls/Public/Player/PlayerCyberStateAttributeComponent.h"
+#include "cybersouls/Public/Player/DashAbilityComponent.h"
 #include "cybersouls/Public/Abilities/SlashAbilityComponent.h"
 #include "cybersouls/Public/Abilities/QuickHackComponent.h"
+#include "cybersouls/Public/Abilities/QuickHackManagerComponent.h"
 #include "cybersouls/Public/Abilities/BlockAbilityComponent.h"
 #include "cybersouls/Public/Abilities/DodgeAbilityComponent.h"
 #include "cybersouls/Public/Combat/TargetLockComponent.h"
@@ -28,10 +30,16 @@ ACybersoulsHUD::ACybersoulsHUD()
 	
 	// Initialize displays to hidden
 	bShowXPDisplay = false;
+	bShowPersistentXPDisplay = false;
+	bShowInventoryDisplay = false;
 	bShowDeathScreen = false;
 	bShowPlayAgainButton = false;
 	bShowSwitchNotification = false;
 	SwitchNotificationTimer = 0.0f;
+	
+	// Initialize inventory selection
+	SelectedQuickHackSlot = 0;
+	SelectedPassiveSlot = 0;
 }
 
 void ACybersoulsHUD::BeginPlay()
@@ -66,6 +74,8 @@ void ACybersoulsHUD::DrawHUD()
 	// Draw common elements
 	DrawCrosshair();
 	DrawXPDisplay();
+	DrawPersistentXPDisplay();
+	DrawInventoryDisplay();
 	DrawDeathScreen();
 	DrawPlayAgainButton();
 	DrawCharacterIndicator();
@@ -83,6 +93,7 @@ void ACybersoulsHUD::DrawHUD()
 	else if (PlayerCyberState)
 	{
 		DrawStaminaBar();
+		DrawDashCharges();
 		// Cyber state uses different abilities, no quickhacks
 	}
 }
@@ -147,28 +158,29 @@ void ACybersoulsHUD::DrawHackProgressBar()
 
 void ACybersoulsHUD::DrawQuickHackStatus()
 {
+	if (!PlayerCharacter || !PlayerCharacter->GetQuickHackManager())
+	{
+		return;
+	}
+
 	float StartY = 150.0f;
 	float LineHeight = 25.0f;
-
-	// Draw each QuickHack using the helper method
-	if (PlayerCharacter->GetInterruptProtocolAbility())
-	{
-		DrawQuickHackStatusLine(PlayerCharacter->GetInterruptProtocolAbility(), TEXT("Interrupt Protocol"), 1, StartY);
-	}
-
-	if (PlayerCharacter->GetSystemFreezeAbility())
-	{
-		DrawQuickHackStatusLine(PlayerCharacter->GetSystemFreezeAbility(), TEXT("System Freeze"), 2, StartY + LineHeight);
-	}
-
-	if (PlayerCharacter->GetFirewallAbility())
-	{
-		DrawQuickHackStatusLine(PlayerCharacter->GetFirewallAbility(), TEXT("Firewall"), 3, StartY + 2 * LineHeight);
-	}
 	
-	if (PlayerCharacter->GetKillAbility())
+	UQuickHackManagerComponent* QuickHackManager = PlayerCharacter->GetQuickHackManager();
+	TArray<FString> QuickHackNames = {TEXT("Interrupt Protocol"), TEXT("System Freeze"), TEXT("Firewall"), TEXT("Kill")};
+	
+	// Draw each QuickHack using the manager
+	for (int32 i = 0; i < 4; i++)
 	{
-		DrawQuickHackStatusLine(PlayerCharacter->GetKillAbility(), TEXT("Kill"), 4, StartY + 3 * LineHeight);
+		EQuickHackType Type = QuickHackManager->GetQuickHackInSlot(i + 1);
+		if (Type != EQuickHackType::None)
+		{
+			int32 Index = (int32)Type - 1; // Convert enum to array index
+			if (Index >= 0 && Index < QuickHackNames.Num())
+			{
+				DrawQuickHackStatusLineFromManager(QuickHackManager, i + 1, QuickHackNames[Index], i + 1, StartY + i * LineHeight);
+			}
+		}
 	}
 }
 
@@ -195,6 +207,32 @@ void ACybersoulsHUD::DrawQuickHackStatusLine(UQuickHackComponent* QuickHack, con
 	}
 
 	FColor TextColor = QuickHack->IsQuickHackActive() ? FColor::Yellow : (Cooldown > 0.0f ? FColor::Red : FColor::Green);
+	DrawText(StatusText, TextColor, 50, YPosition, HUDFont);
+}
+
+void ACybersoulsHUD::DrawQuickHackStatusLineFromManager(UQuickHackManagerComponent* Manager, int32 SlotIndex, const FString& Name, int32 KeyNumber, float YPosition)
+{
+	if (!Manager) return;
+
+	FString StatusText = FString::Printf(TEXT("%d. %s"), KeyNumber, *Name);
+	float Cooldown = Manager->GetCooldownRemaining(SlotIndex);
+	
+	if (Manager->IsQuickHackCasting(SlotIndex))
+	{
+		// Show casting progress
+		float CastTime = Manager->GetCastTimeRemaining(SlotIndex);
+		StatusText += FString::Printf(TEXT(" [Casting: %.1fs]"), CastTime);
+	}
+	else if (Cooldown > 0.0f)
+	{
+		StatusText += FString::Printf(TEXT(" (%.1fs)"), Cooldown);
+	}
+	else
+	{
+		StatusText += TEXT(" (Ready)");
+	}
+
+	FColor TextColor = Manager->IsQuickHackCasting(SlotIndex) ? FColor::Yellow : (Cooldown > 0.0f ? FColor::Red : FColor::Green);
 	DrawText(StatusText, TextColor, 50, YPosition, HUDFont);
 }
 
@@ -318,6 +356,204 @@ void ACybersoulsHUD::DrawXPDisplay()
 	DrawText(HackingXPText, FColor::Blue, HackingX, XPY + 15 + 2 * LineHeight, HUDFont, 1.2f);
 }
 
+void ACybersoulsHUD::DrawPersistentXPDisplay()
+{
+	// Only show when toggled by Tab key
+	if (!bShowPersistentXPDisplay)
+	{
+		return;
+	}
+	
+	// Get progression from whichever character is active
+	UPlayerProgressionComponent* Progression = nullptr;
+	if (PlayerCharacter)
+	{
+		Progression = PlayerCharacter->GetPlayerProgression();
+	}
+	else if (PlayerCyberState)
+	{
+		Progression = PlayerCyberState->FindComponentByClass<UPlayerProgressionComponent>();
+	}
+	
+	if (!Progression)
+	{
+		return;
+	}
+
+	// Position XP display in top-left corner (different from quest complete display)
+	float BGWidth = 300.0f;
+	float BGHeight = 120.0f;
+	float XPX = 20.0f;
+	float XPY = 150.0f; // Below other HUD elements
+	float LineHeight = 30.0f;
+
+	// Draw background with border
+	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.85f), XPX, XPY, BGWidth, BGHeight);
+	DrawRect(FLinearColor(0.0f, 1.0f, 0.8f, 1.0f), XPX, XPY, BGWidth, 3.0f); // Top border
+	DrawRect(FLinearColor(0.0f, 1.0f, 0.8f, 1.0f), XPX, XPY, 3.0f, BGHeight); // Left border
+	DrawRect(FLinearColor(0.0f, 1.0f, 0.8f, 1.0f), XPX + BGWidth - 3, XPY, 3.0f, BGHeight); // Right border
+	DrawRect(FLinearColor(0.0f, 1.0f, 0.8f, 1.0f), XPX, XPY + BGHeight - 3, BGWidth, 3.0f); // Bottom border
+
+	// Title
+	DrawText(TEXT("═ XP PROGRESSION ═"), FColor::Cyan, XPX + 70.0f, XPY + 10, HUDFont, 1.1f);
+
+	// Integrity XP
+	FString IntegrityXPText = FString::Printf(TEXT("⚡ Integrity XP: %.0f"), Progression->GetIntegrityXP());
+	DrawText(IntegrityXPText, FColor::Green, XPX + 20.0f, XPY + 10 + LineHeight, HUDFont, 1.0f);
+
+	// Hacking XP
+	FString HackingXPText = FString::Printf(TEXT("🔧 Hacking XP: %.0f"), Progression->GetHackingXP());
+	DrawText(HackingXPText, FColor::Blue, XPX + 20.0f, XPY + 10 + 2 * LineHeight, HUDFont, 1.0f);
+
+	// Instructions
+	DrawText(TEXT("Press [Tab] to close"), FColor::White, XPX + 90.0f, XPY + 10 + 3 * LineHeight, HUDFont, 0.8f);
+}
+
+void ACybersoulsHUD::DrawInventoryDisplay()
+{
+	// Only show when toggled by E key
+	if (!bShowInventoryDisplay)
+	{
+		return;
+	}
+
+	// Only show inventory for default character (QuickHacks not available in CyberState)
+	if (!PlayerCharacter)
+	{
+		// Show message for CyberState
+		float BGWidth = 400.0f;
+		float BGHeight = 100.0f;
+		float InvX = (Canvas->SizeX - BGWidth) * 0.5f;
+		float InvY = (Canvas->SizeY - BGHeight) * 0.5f;
+
+		DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.9f), InvX, InvY, BGWidth, BGHeight);
+		DrawRect(FLinearColor(1.0f, 0.0f, 0.0f, 1.0f), InvX, InvY, BGWidth, 4.0f);
+		DrawRect(FLinearColor(1.0f, 0.0f, 0.0f, 1.0f), InvX, InvY, 4.0f, BGHeight);
+		DrawRect(FLinearColor(1.0f, 0.0f, 0.0f, 1.0f), InvX + BGWidth - 4, InvY, 4.0f, BGHeight);
+		DrawRect(FLinearColor(1.0f, 0.0f, 0.0f, 1.0f), InvX, InvY + BGHeight - 4, BGWidth, 4.0f);
+
+		DrawText(TEXT("INVENTORY NOT AVAILABLE"), FColor::Red, InvX + 80.0f, InvY + 25.0f, HUDFont, 1.2f);
+		DrawText(TEXT("Switch to Default Character"), FColor::White, InvX + 80.0f, InvY + 50.0f, HUDFont, 1.0f);
+		DrawText(TEXT("Press [E] to close"), FColor::Yellow, InvX + 140.0f, InvY + 75.0f, HUDFont, 0.8f);
+		return;
+	}
+
+	// Main inventory display
+	float BGWidth = 800.0f;
+	float BGHeight = 600.0f;
+	float InvX = (Canvas->SizeX - BGWidth) * 0.5f;
+	float InvY = (Canvas->SizeY - BGHeight) * 0.5f;
+
+	// Main background
+	DrawRect(FLinearColor(0.05f, 0.05f, 0.1f, 0.95f), InvX, InvY, BGWidth, BGHeight);
+	
+	// Border
+	float BorderThickness = 4.0f;
+	FLinearColor BorderColor = FLinearColor(0.2f, 0.8f, 1.0f, 1.0f);
+	DrawRect(BorderColor, InvX, InvY, BGWidth, BorderThickness); // Top
+	DrawRect(BorderColor, InvX, InvY, BorderThickness, BGHeight); // Left
+	DrawRect(BorderColor, InvX + BGWidth - BorderThickness, InvY, BorderThickness, BGHeight); // Right
+	DrawRect(BorderColor, InvX, InvY + BGHeight - BorderThickness, BGWidth, BorderThickness); // Bottom
+
+	// Title
+	DrawText(TEXT("▰▰▰ CYBERWARE INVENTORY ▰▰▰"), FColor::Cyan, InvX + 250.0f, InvY + 20.0f, HUDFont, 1.5f);
+
+	// QuickHack section
+	float SectionY = InvY + 80.0f;
+	DrawText(TEXT("═══ QUICKHACK SLOTS ═══"), FColor::Yellow, InvX + 50.0f, SectionY, HUDFont, 1.2f);
+
+	// QuickHack slots (1-4)
+	float SlotSize = 120.0f;
+	float SlotSpacing = 20.0f;
+	float SlotStartX = InvX + 50.0f;
+	float SlotY = SectionY + 40.0f;
+
+	TArray<FString> QuickHackNames = {TEXT("Interrupt Protocol"), TEXT("System Freeze"), TEXT("Firewall"), TEXT("Kill")};
+	TArray<FColor> SlotColors = {FColor::Green, FColor::Blue, FColor::Purple, FColor::Red};
+
+	for (int32 i = 0; i < 4; i++)
+	{
+		float SlotX = SlotStartX + i * (SlotSize + SlotSpacing);
+		
+		// Slot background
+		FLinearColor SlotBG = (i == SelectedQuickHackSlot) ? 
+			FLinearColor(0.3f, 0.6f, 1.0f, 0.8f) : 
+			FLinearColor(0.1f, 0.1f, 0.2f, 0.8f);
+		DrawRect(SlotBG, SlotX, SlotY, SlotSize, SlotSize);
+		
+		// Slot border
+		FLinearColor SlotBorder = (i == SelectedQuickHackSlot) ? 
+			FLinearColor(1.0f, 1.0f, 0.0f, 1.0f) : 
+			FLinearColor(0.5f, 0.5f, 0.5f, 1.0f);
+		DrawRect(SlotBorder, SlotX, SlotY, SlotSize, 3.0f); // Top
+		DrawRect(SlotBorder, SlotX, SlotY, 3.0f, SlotSize); // Left
+		DrawRect(SlotBorder, SlotX + SlotSize - 3, SlotY, 3.0f, SlotSize); // Right
+		DrawRect(SlotBorder, SlotX, SlotY + SlotSize - 3, SlotSize, 3.0f); // Bottom
+
+		// Key number
+		FString KeyText = FString::Printf(TEXT("[%d]"), i + 1);
+		DrawText(KeyText, FColor::White, SlotX + 10.0f, SlotY + 10.0f, HUDFont, 1.1f);
+
+		// QuickHack name
+		DrawText(QuickHackNames[i], SlotColors[i], SlotX + 10.0f, SlotY + 40.0f, HUDFont, 0.9f);
+
+		// Status
+		if (PlayerCharacter && PlayerCharacter->GetQuickHackManager())
+		{
+			UQuickHackManagerComponent* QuickHackManager = PlayerCharacter->GetQuickHackManager();
+			float Cooldown = QuickHackManager->GetCooldownRemaining(i + 1); // Slots are 1-based
+			
+			FString StatusText = Cooldown > 0.0f ? 
+				FString::Printf(TEXT("CD: %.1fs"), Cooldown) : 
+				TEXT("Ready");
+			FColor StatusColor = Cooldown > 0.0f ? FColor::Red : FColor::Green;
+			DrawText(StatusText, StatusColor, SlotX + 10.0f, SlotY + 70.0f, HUDFont, 0.8f);
+		}
+	}
+
+	// Passive abilities section
+	float PassiveY = SectionY + 200.0f;
+	DrawText(TEXT("═══ PASSIVE ABILITY SLOTS ═══"), FColor::Orange, InvX + 50.0f, PassiveY, HUDFont, 1.2f);
+
+	// Passive slots (future implementation)
+	TArray<FString> PassiveNames = {TEXT("Execution Chain"), TEXT("System Overcharge"), TEXT("Neural Buffer"), TEXT("Cyber Resilience")};
+	TArray<FColor> PassiveColors = {FColor::Red, FColor::Blue, FColor::Green, FColor::Purple};
+
+	float PassiveSlotY = PassiveY + 40.0f;
+	for (int32 i = 0; i < 4; i++)
+	{
+		float SlotX = SlotStartX + i * (SlotSize + SlotSpacing);
+		
+		// Slot background
+		FLinearColor SlotBG = (i == SelectedPassiveSlot) ? 
+			FLinearColor(0.6f, 0.3f, 1.0f, 0.8f) : 
+			FLinearColor(0.2f, 0.1f, 0.1f, 0.8f);
+		DrawRect(SlotBG, SlotX, PassiveSlotY, SlotSize, SlotSize);
+		
+		// Slot border
+		FLinearColor SlotBorder = (i == SelectedPassiveSlot) ? 
+			FLinearColor(1.0f, 0.5f, 0.0f, 1.0f) : 
+			FLinearColor(0.5f, 0.5f, 0.5f, 1.0f);
+		DrawRect(SlotBorder, SlotX, PassiveSlotY, SlotSize, 3.0f); // Top
+		DrawRect(SlotBorder, SlotX, PassiveSlotY, 3.0f, SlotSize); // Left
+		DrawRect(SlotBorder, SlotX + SlotSize - 3, PassiveSlotY, 3.0f, SlotSize); // Right
+		DrawRect(SlotBorder, SlotX, PassiveSlotY + SlotSize - 3, SlotSize, 3.0f); // Bottom
+
+		// Passive name
+		DrawText(PassiveNames[i], PassiveColors[i], SlotX + 10.0f, PassiveSlotY + 40.0f, HUDFont, 0.9f);
+
+		// Status (Coming Soon)
+		DrawText(TEXT("Coming Soon"), FColor(128, 128, 128), SlotX + 10.0f, PassiveSlotY + 70.0f, HUDFont, 0.8f);
+	}
+
+	// Instructions
+	float InstructY = InvY + BGHeight - 80.0f;
+	DrawText(TEXT("Navigation Instructions:"), FColor::Cyan, InvX + 50.0f, InstructY, HUDFont, 1.1f);
+	DrawText(TEXT("• Use Number Keys (1-4) to select QuickHack slots"), FColor::White, InvX + 70.0f, InstructY + 25.0f, HUDFont, 0.9f);
+	DrawText(TEXT("• Passive abilities will be available in future updates"), FColor::White, InvX + 70.0f, InstructY + 45.0f, HUDFont, 0.9f);
+	DrawText(TEXT("• Press [E] to close inventory"), FColor::Yellow, InvX + 70.0f, InstructY + 65.0f, HUDFont, 0.9f);
+}
+
 void ACybersoulsHUD::DrawCrosshair()
 {
 	if (!Canvas)
@@ -388,6 +624,74 @@ void ACybersoulsHUD::DrawStaminaBar()
 	// Text
 	FString StaminaText = FString::Printf(TEXT("Stamina: %.0f/%.0f"), Attributes->GetCurrentStamina(), Attributes->MaxStamina);
 	DrawText(StaminaText, FColor::White, BarX, BarY - 20, HUDFont);
+}
+
+void ACybersoulsHUD::DrawDashCharges()
+{
+	if (!PlayerCyberState)
+	{
+		return;
+	}
+
+	UDashAbilityComponent* DashComponent = PlayerCyberState->FindComponentByClass<UDashAbilityComponent>();
+	if (!DashComponent)
+	{
+		return;
+	}
+
+	// Position below stamina bar
+	float StartX = 50.0f;
+	float StartY = 90.0f;
+	float ChargeBoxSize = 30.0f;
+	float ChargeSpacing = 10.0f;
+
+	// Draw dash charges label
+	FString DashLabel = TEXT("Dash Charges:");
+	DrawText(DashLabel, FColor::White, StartX, StartY, HUDFont);
+
+	// Draw charge boxes
+	int32 CurrentCharges = DashComponent->GetCurrentCharges();
+	int32 MaxCharges = DashComponent->GetMaxCharges();
+	
+	for (int32 i = 0; i < MaxCharges; i++)
+	{
+		float BoxX = StartX + 120.0f + (i * (ChargeBoxSize + ChargeSpacing));
+		float BoxY = StartY - 5.0f;
+
+		// Draw box background
+		DrawRect(FLinearColor::Black, BoxX, BoxY, ChargeBoxSize, ChargeBoxSize);
+
+		// Draw charge fill
+		if (i < CurrentCharges)
+		{
+			// Full charge - green
+			DrawRect(FLinearColor::Green, BoxX + 2, BoxY + 2, ChargeBoxSize - 4, ChargeBoxSize - 4);
+		}
+		else if (i == CurrentCharges && CurrentCharges < MaxCharges)
+		{
+			// Regenerating charge - show progress
+			float RegenProgress = DashComponent->GetChargeRegenProgress();
+			
+			// Draw partial fill from bottom up
+			float FillHeight = (ChargeBoxSize - 4) * RegenProgress;
+			float FillY = BoxY + 2 + (ChargeBoxSize - 4 - FillHeight);
+			
+			DrawRect(FLinearColor::Yellow, BoxX + 2, FillY, ChargeBoxSize - 4, FillHeight);
+			
+			// Draw regen timer text
+			float TimeRemaining = DashComponent->ChargeRegenTime - (DashComponent->ChargeRegenTimer);
+			FString TimerText = FString::Printf(TEXT("%.1fs"), TimeRemaining);
+			DrawText(TimerText, FColor::Yellow, BoxX + ChargeBoxSize + 5, BoxY + 5, HUDFont, 0.8f);
+		}
+		// Empty charges remain black
+	}
+
+	// Draw cooldown if in cooldown
+	if (DashComponent->CooldownTimeRemaining > 0.0f)
+	{
+		FString CooldownText = FString::Printf(TEXT("Cooldown: %.1fs"), DashComponent->CooldownTimeRemaining);
+		DrawText(CooldownText, FColor::Red, StartX + 300.0f, StartY, HUDFont);
+	}
 }
 
 void ACybersoulsHUD::DrawCharacterIndicator()
