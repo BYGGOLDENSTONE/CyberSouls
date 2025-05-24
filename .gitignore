@@ -5,6 +5,14 @@
 !.gitignore
 !.gitattributes
 
+# Un-ignore CLAUDE.md for project documentation
+!CLAUDE.md
+
+# Un-ignore documentation files
+!*.md
+!Documentation/
+!Documentation/**
+
 # Un-ignore the Source folder and everything inside it
 !Source/
 !Source/**
