@@ -1,6 +1,5 @@
 // PhysicalEnemyAIController.cpp
 #include "cybersouls/Public/AI/PhysicalEnemyAIController.h"
-#include "cybersouls/Public/AI/HackingEnemyAIController.h"
 #include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "cybersouls/Public/Abilities/AttackAbilityComponent.h"
 #include "GameFramework/Character.h"
@@ -21,24 +20,20 @@ APhysicalEnemyAIController::APhysicalEnemyAIController()
 	AttackRange = 150.0f;      // Closer attack range
 	ChaseSpeed = 600.0f;       // Faster chase speed
 	AcceptanceRadius = 80.0f;  // Stop closer to player
-	SightRange = 2000.0f;      // Larger sight range
 }
 
 APhysicalEnemyAIController::~APhysicalEnemyAIController()
 {
 	// Clean up timer if still active
-	if (GetWorld() && GetWorldTimerManager().IsTimerActive(AlertUpdateTimerHandle))
+	if (GetWorld() && GetWorldTimerManager().IsTimerActive(AttackTimerHandle))
 	{
-		GetWorldTimerManager().ClearTimer(AlertUpdateTimerHandle);
+		GetWorldTimerManager().ClearTimer(AttackTimerHandle);
 	}
 }
 
 void APhysicalEnemyAIController::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	// Find player target
-	PlayerTarget = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
 	
 	// Enable movement updates
 	SetActorTickEnabled(true);
@@ -58,7 +53,6 @@ void APhysicalEnemyAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 	
-	ControlledEnemy = Cast<ACybersoulsEnemyBase>(InPawn);
 	if (!ControlledEnemy)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("PhysicalEnemyAIController possessed non-enemy pawn!"));
@@ -87,8 +81,7 @@ void APhysicalEnemyAIController::OnPossess(APawn* InPawn)
 
 void APhysicalEnemyAIController::OnUnPossess()
 {
-	// Clear timers when unpossessing
-	GetWorldTimerManager().ClearTimer(AlertUpdateTimerHandle);
+	// Clear attack timer when unpossessing
 	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
 	
 	Super::OnUnPossess();
@@ -134,11 +127,7 @@ void APhysicalEnemyAIController::UpdateCombatBehavior()
 		static bool bWasPlayerVisible = false;
 		if (!bWasPlayerVisible)
 		{
-			AlertNearbyEnemies(PlayerTarget->GetActorLocation());
-			// Start periodic updates to keep allies informed
-			GetWorldTimerManager().SetTimer(AlertUpdateTimerHandle, this, 
-				&APhysicalEnemyAIController::UpdateAlliesWithPlayerLocation, 
-				AlertUpdateInterval, true);
+			HandlePlayerVisibility();
 		}
 		bWasPlayerVisible = true;
 		
@@ -180,8 +169,8 @@ void APhysicalEnemyAIController::UpdateCombatBehavior()
 		static bool bWasPlayerVisible = true;
 		if (bWasPlayerVisible)
 		{
-			// Just lost sight, stop updating allies
-			GetWorldTimerManager().ClearTimer(AlertUpdateTimerHandle);
+			// Just lost sight
+			HandlePlayerLostVisibility();
 		}
 		bWasPlayerVisible = false;
 		
@@ -199,65 +188,6 @@ void APhysicalEnemyAIController::UpdateCombatBehavior()
 			StartSearchBehavior();
 		}
 	}
-}
-
-bool APhysicalEnemyAIController::CanSeeTarget(AActor* Target) const
-{
-	if (!Target || !ControlledEnemy)
-	{
-		return false;
-	}
-	
-	// Check distance
-	float Distance = GetDistanceToTarget(Target);
-	if (Distance > SightRange)
-	{
-		return false;
-	}
-	
-	// Line of sight check - requires clear view
-	FVector StartLocation = ControlledEnemy->GetActorLocation();
-	StartLocation.Z += 80.0f; // Eye height
-	FVector EndLocation = Target->GetActorLocation();
-	EndLocation.Z += 50.0f; // Target center mass
-	
-	FHitResult HitResult;
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(ControlledEnemy);
-	QueryParams.AddIgnoredActor(Target);
-	
-	bool bHit = GetWorld()->LineTraceSingleByChannel(
-		HitResult,
-		StartLocation,
-		EndLocation,
-		ECC_Visibility,
-		QueryParams
-	);
-	
-	// Can only see if no hit or hit the target directly
-	bool bCanSee = !bHit || HitResult.GetActor() == Target;
-	
-	// Debug visualization disabled - no longer drawing sight lines
-	// #if ENABLE_DRAW_DEBUG
-	// if (GEngine && GEngine->GetNetMode(GetWorld()) != NM_DedicatedServer)
-	// {
-	// 	DrawDebugLine(GetWorld(), StartLocation, EndLocation, 
-	// 		bCanSee ? FColor::Green : FColor::Red, 
-	// 		false, 0.1f, 0, 1.0f);
-	// }
-	// #endif
-	
-	return bCanSee;
-}
-
-float APhysicalEnemyAIController::GetDistanceToTarget(AActor* Target) const
-{
-	if (!Target || !ControlledEnemy)
-	{
-		return FLT_MAX;
-	}
-	
-	return FVector::Dist(ControlledEnemy->GetActorLocation(), Target->GetActorLocation());
 }
 
 void APhysicalEnemyAIController::MoveToTarget()
@@ -416,58 +346,7 @@ void APhysicalEnemyAIController::UpdateSearchBehavior(float DeltaTime)
 	}
 }
 
-void APhysicalEnemyAIController::AlertNearbyEnemies(const FVector& PlayerLocation)
-{
-	if (!ControlledEnemy)
-	{
-		return;
-	}
-	
-	// Get all actors of the enemy base class
-	TArray<AActor*> FoundEnemies;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACybersoulsEnemyBase::StaticClass(), FoundEnemies);
-	
-	// Alert each enemy within range
-	for (AActor* EnemyActor : FoundEnemies)
-	{
-		if (!EnemyActor || EnemyActor == ControlledEnemy)
-		{
-			continue; // Skip self
-		}
-		
-		// Check if enemy is within alert radius
-		float Distance = FVector::Dist(ControlledEnemy->GetActorLocation(), EnemyActor->GetActorLocation());
-		if (Distance <= AlertRadius)
-		{
-			// Get the AI controller of this enemy
-			ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(EnemyActor);
-			if (Enemy && Enemy->GetController())
-			{
-				// Try physical enemy controller first
-				APhysicalEnemyAIController* PhysicalAI = Cast<APhysicalEnemyAIController>(Enemy->GetController());
-				if (PhysicalAI)
-				{
-					PhysicalAI->ReceiveAlert(PlayerLocation);
-					UE_LOG(LogTemp, Warning, TEXT("%s: Alerting physical enemy %s about player"), 
-						*ControlledEnemy->GetName(), *Enemy->GetName());
-				}
-				else
-				{
-					// Try hacking enemy controller
-					AHackingEnemyAIController* HackingAI = Cast<AHackingEnemyAIController>(Enemy->GetController());
-					if (HackingAI)
-					{
-						HackingAI->ReceiveAlert(PlayerLocation);
-						UE_LOG(LogTemp, Warning, TEXT("%s: Alerting hacking enemy %s about player"), 
-							*ControlledEnemy->GetName(), *Enemy->GetName());
-					}
-				}
-			}
-		}
-	}
-}
-
-void APhysicalEnemyAIController::ReceiveAlert(const FVector& PlayerLocation)
+void APhysicalEnemyAIController::ReceiveAlert(AActor* AlertTarget, const FVector& InAlertLocation)
 {
 	// Don't respond to alerts if we can already see the player
 	if (CanSeeTarget(PlayerTarget))
@@ -476,8 +355,8 @@ void APhysicalEnemyAIController::ReceiveAlert(const FVector& PlayerLocation)
 	}
 	
 	// Update the alert location
-	AlertLocation = PlayerLocation;
-	LastKnownPlayerLocation = PlayerLocation;
+	AlertLocation = InAlertLocation;
+	LastKnownPlayerLocation = InAlertLocation;
 	
 	// If already searching, just update the location
 	if (bIsSearching)
@@ -487,7 +366,7 @@ void APhysicalEnemyAIController::ReceiveAlert(const FVector& PlayerLocation)
 		SearchTimeRemaining = MaxSearchTime; // Reset search timer
 		UE_LOG(LogTemp, Verbose, TEXT("%s: Updated search location to %s"), 
 			ControlledEnemy ? *ControlledEnemy->GetName() : TEXT("Unknown"),
-			*PlayerLocation.ToString());
+			*InAlertLocation.ToString());
 	}
 	else
 	{
@@ -495,28 +374,33 @@ void APhysicalEnemyAIController::ReceiveAlert(const FVector& PlayerLocation)
 		bIsAlerted = true;
 		UE_LOG(LogTemp, Warning, TEXT("%s: Received alert! Player spotted at %s"), 
 			ControlledEnemy ? *ControlledEnemy->GetName() : TEXT("Unknown"),
-			*PlayerLocation.ToString());
+			*InAlertLocation.ToString());
 	}
 }
 
-void APhysicalEnemyAIController::UpdateAlliesWithPlayerLocation()
+void APhysicalEnemyAIController::ReceivePlayerLocationUpdate(AActor* Player, const FVector& PlayerLocation)
 {
-	if (!ControlledEnemy || !PlayerTarget || ControlledEnemy->IsDead())
+	// Update last known location if we're already tracking this player
+	if (PlayerTarget == Player)
 	{
-		return;
-	}
-	
-	// Only update if we can still see the player
-	if (CanSeeTarget(PlayerTarget))
-	{
-		// Send updated player location to all nearby enemies
-		AlertNearbyEnemies(PlayerTarget->GetActorLocation());
-		UE_LOG(LogTemp, Verbose, TEXT("%s: Updating allies with player location"), *ControlledEnemy->GetName());
-	}
-	else
-	{
-		// Lost sight, stop updating
-		GetWorldTimerManager().ClearTimer(AlertUpdateTimerHandle);
+		LastKnownPlayerLocation = PlayerLocation;
 	}
 }
 
+void APhysicalEnemyAIController::HandlePlayerVisibility()
+{
+	// Alert nearby enemies when we spot the player
+	if (CurrentTarget != PlayerTarget)
+	{
+		AlertNearbyEnemies(PlayerTarget);
+	}
+}
+
+void APhysicalEnemyAIController::HandlePlayerLostVisibility()
+{
+	// Stop alerting when we lose sight
+	StopAlertingAllies();
+	
+	// Start search behavior
+	StartSearchBehavior();
+}

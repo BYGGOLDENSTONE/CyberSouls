@@ -20,7 +20,7 @@ void ACybersoulsNetrunner::BeginPlay()
 	// Bind death event
 	if (EnemyAttributes)
 	{
-		EnemyAttributes->OnDeath.AddDynamic(this, &ACybersoulsNetrunner::OnEnemyDeath);
+		EnemyAttributes->OnDeath.AddDynamic(this, &ACybersoulsNetrunner::OnDeath);
 	}
 	
 	// Activate hacking ability
@@ -48,8 +48,3 @@ void ACybersoulsNetrunner::InitializeEnemy()
 	}
 }
 
-void ACybersoulsNetrunner::OnEnemyDeath()
-{
-	// Use base class death handling
-	OnDeath();
-}

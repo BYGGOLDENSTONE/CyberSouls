@@ -38,6 +38,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Quest")
 	int32 GetAliveEnemyCount() const { return AliveEnemies.Num(); }
 
+	// Restart functionality
+	UFUNCTION(BlueprintCallable, Category = "Game")
+	void RestartLevel(bool bResetXP);
+
+	UFUNCTION(BlueprintCallable, Category = "Game")
+	void OnPlayerDeath();
+
 protected:
 	virtual void BeginPlay() override;
 

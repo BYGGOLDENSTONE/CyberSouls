@@ -26,8 +26,4 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void InitializeEnemy() override;
-	
-	// Death handling
-	UFUNCTION()
-	void OnEnemyDeath();
 };

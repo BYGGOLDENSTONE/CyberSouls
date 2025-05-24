@@ -26,7 +26,7 @@ void ACybersoulsDodgeEnemy::BeginPlay()
 	// Bind death event
 	if (EnemyAttributes)
 	{
-		EnemyAttributes->OnDeath.AddDynamic(this, &ACybersoulsDodgeEnemy::OnEnemyDeath);
+		EnemyAttributes->OnDeath.AddDynamic(this, &ACybersoulsDodgeEnemy::OnDeath);
 	}
 }
 
@@ -57,8 +57,3 @@ void ACybersoulsDodgeEnemy::InitializeEnemy()
 	}
 }
 
-void ACybersoulsDodgeEnemy::OnEnemyDeath()
-{
-	// Use base class death handling
-	OnDeath();
-}

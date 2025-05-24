@@ -61,3 +61,12 @@ void UPlayerProgressionComponent::LoadProgression()
 	// TODO: Implement load system when needed
 	UE_LOG(LogTemp, Log, TEXT("Progression loaded - Integrity XP: %f, Hacking XP: %f"), IntegrityXP, HackingXP);
 }
+
+void UPlayerProgressionComponent::ResetProgression()
+{
+	IntegrityXP = 0.0f;
+	HackingXP = 0.0f;
+	OnIntegrityXPChanged.Broadcast(IntegrityXP);
+	OnHackingXPChanged.Broadcast(HackingXP);
+	UE_LOG(LogTemp, Warning, TEXT("Progression reset to zero"));
+}

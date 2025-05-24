@@ -53,6 +53,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Progression")
 	void LoadProgression();
 
+	UFUNCTION(BlueprintCallable, Category = "Progression")
+	void ResetProgression();
+
 protected:
 	virtual void BeginPlay() override;
 

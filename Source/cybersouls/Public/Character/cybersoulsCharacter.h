@@ -71,6 +71,10 @@ class AcybersoulsCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* CameraToggleAction;
 
+	/** Switch Character Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* SwitchCharacterAction;
+
 	/** Game system components */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
 	class UPlayerAttributeComponent* PlayerAttributes;
@@ -119,6 +123,9 @@ protected:
 	/** Called for camera toggle input */
 	void ToggleCameraView();
 
+	/** Called for character switch input */
+	void OnSwitchCharacter();
+
 	/** Crosshair-based aiming */
 	void UpdateCrosshairTarget();
 	void DetermineCrosshairBodyPart(const FHitResult& HitResult);
@@ -137,6 +144,10 @@ protected:
 	
 	// Tick
 	virtual void Tick(float DeltaTime) override;
+	
+	// Death handling
+	UFUNCTION()
+	void HandlePlayerDeath();
 
 public:
 	/** Returns CameraBoom subobject **/

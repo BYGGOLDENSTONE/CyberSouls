@@ -1,6 +1,5 @@
 // HackingEnemyAIController.cpp
 #include "cybersouls/Public/AI/HackingEnemyAIController.h"
-#include "cybersouls/Public/AI/PhysicalEnemyAIController.h"
 #include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "cybersouls/Public/Character/cybersoulsCharacter.h"
 #include "cybersouls/Public/Abilities/HackAbilityComponent.h"
@@ -20,26 +19,16 @@ AHackingEnemyAIController::AHackingEnemyAIController()
 	
 	// Default values for ranged combat
 	HackRange = 1500.0f;
-	SafeDistance = 800.0f;
-	RetreatSpeed = 300.0f;
+	
+	// Override base class defaults for hacking enemies
 	SightRange = 2000.0f;
+	AlertRadius = 2500.0f; // Larger radius for hacking enemies
 }
 
-AHackingEnemyAIController::~AHackingEnemyAIController()
-{
-	// Clean up timer if still active
-	if (GetWorld() && GetWorldTimerManager().IsTimerActive(AlertUpdateTimerHandle))
-	{
-		GetWorldTimerManager().ClearTimer(AlertUpdateTimerHandle);
-	}
-}
 
 void AHackingEnemyAIController::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	// Find player target
-	PlayerTarget = Cast<AcybersoulsCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
 }
 
 void AHackingEnemyAIController::OnPossess(APawn* InPawn)
@@ -60,8 +49,7 @@ void AHackingEnemyAIController::OnPossess(APawn* InPawn)
 
 void AHackingEnemyAIController::OnUnPossess()
 {
-	// Clear timers when unpossessing
-	GetWorldTimerManager().ClearTimer(AlertUpdateTimerHandle);
+	// Clear QuickHack timer when unpossessing
 	GetWorldTimerManager().ClearTimer(QuickHackTimerHandle);
 	
 	Super::OnUnPossess();
@@ -84,23 +72,11 @@ void AHackingEnemyAIController::UpdateHackingBehavior()
 	// Check if player is in sight
 	if (CanSeeTarget(PlayerTarget))
 	{
-		// Clear alert status when we see the player
-		bIsAlerted = false;
+		// Handle alert status and ally communication using base class
+		HandlePlayerVisibility();
 		
-		// Alert nearby enemies when we spot the player
-		static bool bWasPlayerVisible = false;
-		if (!bWasPlayerVisible)
-		{
-			AlertNearbyEnemies(PlayerTarget->GetActorLocation());
-			// Start periodic updates to keep allies informed
-			GetWorldTimerManager().SetTimer(AlertUpdateTimerHandle, this, 
-				&AHackingEnemyAIController::UpdateAlliesWithPlayerLocation, 
-				AlertUpdateInterval, true);
-		}
-		bWasPlayerVisible = true;
-		
-		// Maintain optimal distance
-		MaintainDistance();
+		// Hacking enemies don't move - they stay in position
+		StopMovement();
 		
 		// Face the target
 		FVector Direction = (PlayerTarget->GetActorLocation() - ControlledEnemy->GetActorLocation()).GetSafeNormal();
@@ -120,76 +96,15 @@ void AHackingEnemyAIController::UpdateHackingBehavior()
 	}
 	else
 	{
-		// Update visibility tracking
-		static bool bWasPlayerVisible = true;
-		if (bWasPlayerVisible)
-		{
-			// Just lost sight, stop updating allies
-			GetWorldTimerManager().ClearTimer(AlertUpdateTimerHandle);
-		}
-		bWasPlayerVisible = false;
+		// Handle lost visibility using base class
+		HandlePlayerLostVisibility();
 		
 		// Hacking enemies don't move, even when alerted
 		// They stay in their position and hack from range
 		StopMovement();
-		
-		// Clear alert flag but don't move
-		if (bIsAlerted)
-		{
-			bIsAlerted = false;
-		}
 	}
 }
 
-bool AHackingEnemyAIController::CanSeeTarget(AActor* Target) const
-{
-	if (!Target || !ControlledEnemy)
-	{
-		return false;
-	}
-	
-	// Check distance
-	float Distance = GetDistanceToTarget(Target);
-	if (Distance > SightRange)
-	{
-		return false;
-	}
-	
-	// Line of sight check
-	FVector StartLocation = ControlledEnemy->GetActorLocation();
-	FVector EndLocation = Target->GetActorLocation();
-	
-	FHitResult HitResult;
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(ControlledEnemy);
-	
-	bool bHit = GetWorld()->LineTraceSingleByChannel(
-		HitResult,
-		StartLocation,
-		EndLocation,
-		ECC_Visibility,
-		QueryParams
-	);
-	
-	return !bHit || HitResult.GetActor() == Target;
-}
-
-float AHackingEnemyAIController::GetDistanceToTarget(AActor* Target) const
-{
-	if (!Target || !ControlledEnemy)
-	{
-		return FLT_MAX;
-	}
-	
-	return FVector::Dist(ControlledEnemy->GetActorLocation(), Target->GetActorLocation());
-}
-
-void AHackingEnemyAIController::MaintainDistance()
-{
-	// Hacking enemies no longer move - they stay in position
-	// Just ensure we're stopped
-	StopMovement();
-}
 
 void AHackingEnemyAIController::PerformHacking()
 {
@@ -235,11 +150,6 @@ void AHackingEnemyAIController::AttemptQuickHack()
 bool AHackingEnemyAIController::IsInHackRange() const
 {
 	return GetDistanceToTarget(PlayerTarget) <= HackRange;
-}
-
-bool AHackingEnemyAIController::IsTooClose() const
-{
-	return GetDistanceToTarget(PlayerTarget) < SafeDistance;
 }
 
 bool AHackingEnemyAIController::IsPlayerCastingQuickHack() const
@@ -380,92 +290,18 @@ void AHackingEnemyAIController::CacheQuickHackComponents()
 	}
 }
 
-void AHackingEnemyAIController::AlertNearbyEnemies(const FVector& PlayerLocation)
+void AHackingEnemyAIController::HandlePlayerVisibility()
 {
-	if (!ControlledEnemy)
+	// Alert nearby enemies when we spot the player
+	if (CurrentTarget != PlayerTarget)
 	{
-		return;
-	}
-	
-	// Get all actors of the enemy base class
-	TArray<AActor*> FoundEnemies;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACybersoulsEnemyBase::StaticClass(), FoundEnemies);
-	
-	// Alert each enemy within range
-	for (AActor* EnemyActor : FoundEnemies)
-	{
-		if (!EnemyActor || EnemyActor == ControlledEnemy)
-		{
-			continue; // Skip self
-		}
-		
-		// Check if enemy is within alert radius
-		float Distance = FVector::Dist(ControlledEnemy->GetActorLocation(), EnemyActor->GetActorLocation());
-		if (Distance <= AlertRadius)
-		{
-			// Get the AI controller of this enemy
-			ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(EnemyActor);
-			if (Enemy && Enemy->GetController())
-			{
-				// Try physical enemy controller first
-				APhysicalEnemyAIController* PhysicalAI = Cast<APhysicalEnemyAIController>(Enemy->GetController());
-				if (PhysicalAI)
-				{
-					PhysicalAI->ReceiveAlert(PlayerLocation);
-					UE_LOG(LogTemp, Warning, TEXT("%s: Alerting physical enemy %s about player"), 
-						*ControlledEnemy->GetName(), *Enemy->GetName());
-				}
-				else
-				{
-					// Try hacking enemy controller
-					AHackingEnemyAIController* HackingAI = Cast<AHackingEnemyAIController>(Enemy->GetController());
-					if (HackingAI)
-					{
-						HackingAI->ReceiveAlert(PlayerLocation);
-						UE_LOG(LogTemp, Warning, TEXT("%s: Alerting hacking enemy %s about player"), 
-							*ControlledEnemy->GetName(), *Enemy->GetName());
-					}
-				}
-			}
-		}
+		AlertNearbyEnemies(PlayerTarget);
 	}
 }
 
-void AHackingEnemyAIController::ReceiveAlert(const FVector& PlayerLocation)
+void AHackingEnemyAIController::HandlePlayerLostVisibility()
 {
-	// Don't respond to alerts if we can already see the player
-	if (CanSeeTarget(PlayerTarget))
-	{
-		return;
-	}
-	
-	// Store the alert information
-	bIsAlerted = true;
-	AlertLocation = PlayerLocation;
-	
-	UE_LOG(LogTemp, Warning, TEXT("%s: Received alert! Player spotted at %s"), 
-		ControlledEnemy ? *ControlledEnemy->GetName() : TEXT("Unknown"),
-		*PlayerLocation.ToString());
-}
-
-void AHackingEnemyAIController::UpdateAlliesWithPlayerLocation()
-{
-	if (!ControlledEnemy || !PlayerTarget || ControlledEnemy->IsDead())
-	{
-		return;
-	}
-	
-	// Only update if we can still see the player
-	if (CanSeeTarget(PlayerTarget))
-	{
-		// Send updated player location to all nearby enemies
-		AlertNearbyEnemies(PlayerTarget->GetActorLocation());
-		UE_LOG(LogTemp, Verbose, TEXT("%s: Updating allies with player location"), *ControlledEnemy->GetName());
-	}
-	else
-	{
-		// Lost sight, stop updating
-		GetWorldTimerManager().ClearTimer(AlertUpdateTimerHandle);
-	}
+	// Stop alerting when we lose sight
+	StopAlertingAllies();
 }
 

@@ -17,6 +17,8 @@
 #include "cybersouls/Public/Abilities/BaseAbilityComponent.h"
 #include "cybersouls/Public/Combat/BodyPartComponent.h"
 #include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
+#include "cybersouls/Public/Player/CyberSoulsPlayerController.h"
+#include "cybersouls/Public/Game/cybersoulsGameMode.h"
 #include "TimerManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
@@ -77,6 +79,12 @@ void AcybersoulsCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
+	
+	// Bind player death to game mode
+	if (PlayerAttributes)
+	{
+		PlayerAttributes->OnDeath.AddDynamic(this, &AcybersoulsCharacter::HandlePlayerDeath);
+	}
 	
 	// Initialize QuickHack types
 	if (InterruptProtocolAbility)
@@ -144,6 +152,17 @@ void AcybersoulsCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
 		// Camera Toggle
 		EnhancedInputComponent->BindAction(CameraToggleAction, ETriggerEvent::Started, this, &AcybersoulsCharacter::ToggleCameraView);
+
+		// Character Switch
+		if (SwitchCharacterAction)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("DEFAULT CHARACTER: Binding SwitchCharacterAction"));
+			EnhancedInputComponent->BindAction(SwitchCharacterAction, ETriggerEvent::Started, this, &AcybersoulsCharacter::OnSwitchCharacter);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("DEFAULT CHARACTER: SwitchCharacterAction is NULL!"));
+		}
 	}
 	else
 	{
@@ -241,6 +260,22 @@ void AcybersoulsCharacter::ToggleCameraView()
 		GetMesh()->SetOwnerNoSee(false);
 		
 		UE_LOG(LogTemp, Warning, TEXT("Switched to Third Person View"));
+	}
+}
+
+void AcybersoulsCharacter::OnSwitchCharacter()
+{
+	UE_LOG(LogTemp, Warning, TEXT("DEFAULT CHARACTER: OnSwitchCharacter() called!"));
+	
+	if (ACyberSoulsPlayerController* CyberController = Cast<ACyberSoulsPlayerController>(GetController()))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("DEFAULT CHARACTER: Found CyberSoulsPlayerController, calling SwitchCharacter()"));
+		CyberController->SwitchCharacter();
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("DEFAULT CHARACTER: Controller is NOT CyberSoulsPlayerController! Type: %s"), 
+			GetController() ? *GetController()->GetClass()->GetName() : TEXT("NULL"));
 	}
 }
 
@@ -428,4 +463,29 @@ AActor* AcybersoulsCharacter::GetCrosshairTarget() const
 EBodyPart AcybersoulsCharacter::GetCrosshairBodyPart() const
 {
 	return CrosshairBodyPart;
+}
+
+void AcybersoulsCharacter::HandlePlayerDeath()
+{
+	// Notify game mode of player death
+	AcybersoulsGameMode* GameMode = Cast<AcybersoulsGameMode>(GetWorld()->GetAuthGameMode());
+	if (GameMode)
+	{
+		GameMode->OnPlayerDeath();
+	}
+	
+	// Disable player input
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (PC)
+	{
+		DisableInput(PC);
+		
+		// Keep only restart input enabled
+		ACyberSoulsPlayerController* CyberPC = Cast<ACyberSoulsPlayerController>(PC);
+		if (CyberPC)
+		{
+			// Re-enable just the restart action
+			EnableInput(PC);
+		}
+	}
 }

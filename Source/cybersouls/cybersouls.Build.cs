@@ -28,6 +28,8 @@ public class cybersouls : ModuleRules
 			"cybersouls/Public/Combat",
 			"cybersouls/Public/Enemy",
 			"cybersouls/Public/Game",
+			"cybersouls/Public/Input",
+			"cybersouls/Public/Player",
 			"cybersouls/Public/UI"
 		});
 	}

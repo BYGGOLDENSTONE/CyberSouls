@@ -31,10 +31,6 @@ protected:
 	virtual void InitializeEnemy() override;
 	virtual void TickActor(float DeltaTime, ELevelTick TickType, FActorTickFunction& ThisTickFunction) override;
 	
-	// Death handling
-	UFUNCTION()
-	void OnEnemyDeath();
-	
 private:
 	UPROPERTY(EditAnywhere, Category = "QuickHack")
 	float QuickHackChance = 0.4f; // Chance to cast QuickHack per second

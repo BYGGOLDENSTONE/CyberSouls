@@ -6,9 +6,11 @@
 #include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "cybersouls/Public/Attributes/PlayerAttributeComponent.h"
 #include "cybersouls/Public/Attributes/PlayerProgressionComponent.h"
+#include "cybersouls/Public/Player/CyberSoulsPlayerController.h"
 #include "UObject/ConstructorHelpers.h"
 #include "EngineUtils.h"
 #include "Engine/Engine.h"
+#include "Kismet/GameplayStatics.h"
 
 AcybersoulsGameMode::AcybersoulsGameMode()
 {
@@ -21,6 +23,9 @@ AcybersoulsGameMode::AcybersoulsGameMode()
 
 	// Set default HUD class
 	HUDClass = ACybersoulsHUD::StaticClass();
+	
+	// Set custom player controller
+	PlayerControllerClass = ACyberSoulsPlayerController::StaticClass();
 }
 
 void AcybersoulsGameMode::BeginPlay()
@@ -108,4 +113,46 @@ void AcybersoulsGameMode::CompleteQuest()
 	}
 	
 	OnQuestCompleted.Broadcast();
+}
+
+void AcybersoulsGameMode::RestartLevel(bool bResetXP)
+{
+	if (!GetWorld())
+	{
+		UE_LOG(LogTemp, Error, TEXT("RestartLevel: World is null"));
+		return;
+	}
+	
+	// If resetting XP, clear player progression
+	if (bResetXP)
+	{
+		APlayerController* PC = GetWorld()->GetFirstPlayerController();
+		if (IsValid(PC) && IsValid(PC->GetPawn()))
+		{
+			UPlayerProgressionComponent* PlayerProgression = PC->GetPawn()->FindComponentByClass<UPlayerProgressionComponent>();
+			if (IsValid(PlayerProgression))
+			{
+				PlayerProgression->ResetProgression();
+			}
+		}
+	}
+	
+	// Use UGameplayStatics for level restart
+	UGameplayStatics::OpenLevel(GetWorld(), FName(*GetWorld()->GetMapName()), false);
+}
+
+void AcybersoulsGameMode::OnPlayerDeath()
+{
+	UE_LOG(LogTemp, Warning, TEXT("Player has died!"));
+	
+	// Show death screen in HUD
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (PC)
+	{
+		ACybersoulsHUD* CybersoulsHUD = Cast<ACybersoulsHUD>(PC->GetHUD());
+		if (CybersoulsHUD)
+		{
+			CybersoulsHUD->ShowDeathScreen();
+		}
+	}
 }

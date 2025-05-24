@@ -27,7 +27,7 @@ void ACybersoulsDebuffNetrunner::BeginPlay()
 	// Bind death event
 	if (EnemyAttributes)
 	{
-		EnemyAttributes->OnDeath.AddDynamic(this, &ACybersoulsDebuffNetrunner::OnEnemyDeath);
+		EnemyAttributes->OnDeath.AddDynamic(this, &ACybersoulsDebuffNetrunner::OnDeath);
 	}
 	
 	// Activate hacking ability
@@ -84,8 +84,3 @@ void ACybersoulsDebuffNetrunner::TickActor(float DeltaTime, ELevelTick TickType,
 	// QuickHack logic is now handled by HackingEnemyAIController
 }
 
-void ACybersoulsDebuffNetrunner::OnEnemyDeath()
-{
-	// Use base class death handling
-	OnDeath();
-}
