@@ -1,13 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/ActorComponent.h"
+#include "cybersouls/Public/Abilities/BaseAbilityComponent.h"
 #include "DoubleJumpAbilityComponent.generated.h"
 
 class UPlayerCyberStateAttributeComponent;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class CYBERSOULS_API UDoubleJumpAbilityComponent : public UActorComponent
+class CYBERSOULS_API UDoubleJumpAbilityComponent : public UBaseAbilityComponent
 {
     GENERATED_BODY()
 
@@ -23,11 +23,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability")
     int32 MaxJumpsInAir = 1;
 
-    UFUNCTION(BlueprintCallable, Category = "Ability")
-    bool CanPerformAbility() const;
-
-    UFUNCTION(BlueprintCallable, Category = "Ability")
-    void PerformAbility();
+    virtual bool CanActivateAbility() override;
+    virtual void ActivateAbility() override;
+    virtual void DeactivateAbility() override;
     
     void ResetJumpCount();
 

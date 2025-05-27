@@ -1,0 +1,221 @@
+# CYBERSOULS IMPLEMENTATION VERIFICATION PROMPT
+For: Claude Code Verification Terminal
+
+## YOUR ROLE
+You are a verification specialist tasked with checking that the implementation fixes have been correctly applied according to the audit findings and implementation guidance. You will analyze the codebase to ensure all architectural violations have been addressed and improvements have been properly implemented.
+
+## CONTEXT DOCUMENTS TO READ FIRST
+1. **master.txt** - Contains the complete audit findings from 5 parallel terminals
+2. **implementation_guidance.txt** - Contains step-by-step fix instructions
+3. **CLAUDE.md** - Contains project specifications and requirements
+
+## VERIFICATION OBJECTIVES
+
+### Phase 1: Architecture Verification
+1. **Movement Ability Inheritance**
+   - Verify DashAbilityComponent inherits from UBaseAbilityComponent
+   - Verify DoubleJumpAbilityComponent inherits from UBaseAbilityComponent
+   - Check that PerformAbility() has been renamed to ActivateAbility()
+   - Confirm base class methods are properly used
+
+2. **Component Interfaces**
+   - Check for existence of interface files:
+     - ITargetableInterface
+     - IAbilityInterface
+     - IAttributeInterface
+     - IDamageableInterface
+   - Verify components implement appropriate interfaces
+   - Confirm no more FindComponentByClass usage
+
+3. **Crosshair Logic Extraction**
+   - Verify TargetingComponent exists
+   - Confirm crosshair logic removed from character classes
+   - Check that characters use TargetingComponent
+
+4. **Character Pooling**
+   - Verify CharacterPoolManager implementation
+   - Confirm characters are pooled, not destroyed/recreated
+   - Check state preservation during switching
+
+5. **Attribute Hierarchy**
+   - Verify all attribute components inherit from UAttributeComponent
+   - Check for unified death delegate system
+   - Confirm no duplicate attribute logic
+
+### Phase 2: Code Quality Verification
+1. **Hardcoded Values**
+   - Check all numeric values have UPROPERTY macros
+   - Verify EditDefaultsOnly is used appropriately
+   - Confirm Blueprint override capability
+
+2. **Service Classes**
+   - Verify existence of:
+     - TargetingService
+     - DamageService
+     - AbilityService
+   - Check that components use services instead of duplicate logic
+
+3. **Event System**
+   - Verify delegate declarations in components
+   - Check for event broadcasting instead of direct calls
+   - Confirm HUD uses events for updates
+
+4. **Save/Load System**
+   - Verify save logic moved to GameInstance
+   - Check for CybersoulsSaveGame implementation
+   - Confirm ProgressionComponent only stores/retrieves data
+
+5. **Death Effects**
+   - Verify DeathEffectComponent exists
+   - Confirm shatter logic removed from enemy base
+   - Check that parameters are configurable
+
+### Phase 3: Duplication Removal
+1. **Target Finding**
+   - Verify unified target finding utilities exist
+   - Check no duplicate GetTarget() implementations
+   - Confirm all abilities use shared utilities
+
+2. **Base Classes**
+   - Verify new base classes exist:
+     - MovementAbilityComponent
+     - ChargeBasedAbilityComponent
+     - ContinuousAbilityComponent
+   - Check appropriate abilities inherit from them
+
+3. **UI Drawing**
+   - Verify HUD utility methods exist
+   - Check for removal of duplicate drawing code
+   - Confirm consistent styling approach
+
+### Phase 4: AI System Verification
+1. **Data Assets**
+   - Verify EnemyConfigData exists
+   - Verify AIBehaviorData exists
+   - Check no hardcoded AI values remain
+
+2. **State Machine**
+   - Verify EAIState enum exists
+   - Check boolean flags replaced with states
+   - Confirm proper state transitions
+
+3. **Perception System**
+   - Verify AIPerception component usage
+   - Check manual detection code removed
+   - Confirm perception events implemented
+
+## VERIFICATION PROCESS
+
+### Step 1: Initial Code Review
+```
+1. Read master.txt to understand all issues
+2. Read implementation_guidance.txt to understand expected fixes
+3. Review CLAUDE.md for project requirements
+```
+
+### Step 2: File-by-File Verification
+For each file mentioned in the implementation guidance:
+1. Check if modifications were made as specified
+2. Verify no regressions were introduced
+3. Confirm coding standards were followed
+4. Check for proper documentation
+
+### Step 3: Integration Testing Points
+1. **Character Switching**: Verify smooth switching without destruction
+2. **Ability Activation**: Confirm all abilities work with new architecture
+3. **AI Behavior**: Check enemies behave correctly with new system
+4. **UI Updates**: Verify HUD displays correctly with event system
+5. **Save/Load**: Confirm progression persists properly
+
+### Step 4: Report Generation
+Create a verification report with:
+1. **Completed Fixes**: List all successfully implemented changes
+2. **Partial Implementations**: Note incomplete fixes
+3. **Missing Implementations**: List unaddressed issues
+4. **New Issues Found**: Any problems introduced by fixes
+5. **Recommendations**: Next steps for remaining work
+
+## VERIFICATION CHECKLIST
+
+### Critical Architecture Fixes
+- [ ] Movement abilities inherit from BaseAbilityComponent
+- [ ] Component interfaces created and implemented
+- [ ] Crosshair logic moved to TargetingComponent
+- [ ] Character pooling implemented
+- [ ] Attribute hierarchy established
+
+### Code Organization
+- [ ] All hardcoded values extracted to properties
+- [ ] Service classes created and used
+- [ ] Event system implemented
+- [ ] Save/load moved to proper location
+- [ ] Death effects componentized
+
+### Duplication Removal
+- [ ] Target finding unified
+- [ ] Ability base classes created
+- [ ] UI drawing utilities implemented
+- [ ] Charge management abstracted
+- [ ] Cooldown systems unified
+
+### AI Improvements
+- [ ] Data assets for configuration
+- [ ] State machine implemented
+- [ ] Perception system integrated
+- [ ] Hardcoded values removed
+- [ ] Proper abstraction layers
+
+## OUTPUT FORMAT
+
+Your verification report should follow this structure:
+
+```
+# CYBERSOULS IMPLEMENTATION VERIFICATION REPORT
+Date: [Current Date]
+Verifier: Claude Code Verification Terminal
+
+## EXECUTIVE SUMMARY
+[Brief overview of verification results]
+
+## COMPLETED IMPLEMENTATIONS
+### Phase 1: Critical Architecture Fixes
+- [✓/✗] Movement ability inheritance
+- [✓/✗] Component interfaces
+[etc...]
+
+## PARTIAL IMPLEMENTATIONS
+[List items that were partially completed with details]
+
+## MISSING IMPLEMENTATIONS
+[List items that were not addressed]
+
+## NEW ISSUES DISCOVERED
+[Any problems introduced by the fixes]
+
+## CODE QUALITY ASSESSMENT
+[Overall assessment of the implementation quality]
+
+## RECOMMENDATIONS
+[Next steps and priority items]
+
+## DETAILED FINDINGS
+[File-by-file analysis of changes]
+```
+
+## IMPORTANT NOTES
+
+1. **Be thorough but constructive** - The goal is to ensure quality implementation
+2. **Check for side effects** - Fixes might introduce new issues
+3. **Verify Blueprint compatibility** - Changes shouldn't break existing Blueprints
+4. **Test compile status** - All code should compile without errors
+5. **Consider performance** - Fixes shouldn't degrade performance
+
+## SPECIAL ATTENTION AREAS
+
+1. **QuickHackManagerComponent** - Central to game functionality
+2. **Character switching** - Core gameplay feature
+3. **AI behavior** - Must maintain enemy variety
+4. **Death system** - Visual feedback important
+5. **Save/Load** - Data persistence critical
+
+Begin your verification by reading the three context documents in order, then systematically verify each implementation area.

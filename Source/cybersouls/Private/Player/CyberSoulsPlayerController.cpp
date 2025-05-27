@@ -1,4 +1,5 @@
 #include "cybersouls/Public/Player/CyberSoulsPlayerController.h"
+#include "cybersouls/Public/Player/CharacterPoolManager.h"
 #include "cybersouls/Public/Character/cybersoulsCharacter.h"
 #include "cybersouls/Public/Character/PlayerCyberState.h"
 #include "cybersouls/Public/Input/CyberSoulsInputConfig.h"
@@ -16,6 +17,7 @@
 ACyberSoulsPlayerController::ACyberSoulsPlayerController()
 {
     bIsUsingCyberState = false;
+    CharacterPool = nullptr;
     UE_LOG(LogTemp, Warning, TEXT("CYBER SOULS PLAYER CONTROLLER: Constructor called"));
 }
 
@@ -43,7 +45,7 @@ void ACyberSoulsPlayerController::BeginPlay()
         UE_LOG(LogTemp, Error, TEXT("CYBER SOULS PLAYER CONTROLLER: Failed to get Enhanced Input Subsystem"));
     }
     
-    SpawnCharacters();
+    InitializeCharacterPool();
 }
 
 void ACyberSoulsPlayerController::SetupInputComponent()
@@ -91,9 +93,9 @@ void ACyberSoulsPlayerController::SetupInputComponent()
     }
 }
 
-void ACyberSoulsPlayerController::SpawnCharacters()
+void ACyberSoulsPlayerController::InitializeCharacterPool()
 {
-    UE_LOG(LogTemp, Warning, TEXT("PLAYER CONTROLLER: SpawnCharacters() called"));
+    UE_LOG(LogTemp, Warning, TEXT("PLAYER CONTROLLER: InitializeCharacterPool() called"));
     
     UWorld* World = GetWorld();
     if (!World) 
@@ -102,62 +104,50 @@ void ACyberSoulsPlayerController::SpawnCharacters()
         return;
     }
 
-    // Get player start location if available
-    FVector InitialLocation = FVector::ZeroVector;
-    FRotator InitialRotation = FRotator::ZeroRotator;
+    // Create the character pool manager
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = this;
+    CharacterPool = World->SpawnActor<ACharacterPoolManager>(ACharacterPoolManager::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
     
-    if (APawn* ExistingPawn = GetPawn())
+    if (!CharacterPool)
     {
-        InitialLocation = ExistingPawn->GetActorLocation();
-        InitialRotation = ExistingPawn->GetActorRotation();
+        UE_LOG(LogTemp, Error, TEXT("PLAYER CONTROLLER: Failed to create CharacterPoolManager!"));
+        return;
     }
-    else
+    
+    // Initialize the pool with our character classes
+    CharacterPool->InitializePool(DefaultCharacterClass, CyberStateCharacterClass);
+    
+    // Get and possess the default character
+    if (ACharacter* DefaultChar = CharacterPool->GetCharacter(false))
     {
-        // Try to find a player start
-        AActor* PlayerStart = UGameplayStatics::GetActorOfClass(World, APlayerStart::StaticClass());
-        if (PlayerStart)
+        UE_LOG(LogTemp, Warning, TEXT("PLAYER CONTROLLER: Got Default Character from pool"));
+        
+        // Get player start location
+        FVector InitialLocation = FVector::ZeroVector;
+        FRotator InitialRotation = FRotator::ZeroRotator;
+        
+        if (AActor* PlayerStart = UGameplayStatics::GetActorOfClass(World, APlayerStart::StaticClass()))
         {
             InitialLocation = PlayerStart->GetActorLocation();
             InitialRotation = PlayerStart->GetActorRotation();
         }
-    }
-
-    UE_LOG(LogTemp, Log, TEXT("PLAYER CONTROLLER: Initial location: %s"), *InitialLocation.ToString());
-
-    // Only spawn the default character initially
-    if (DefaultCharacterClass)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("PLAYER CONTROLLER: Spawning Default Character of class: %s"), *DefaultCharacterClass->GetName());
-        FActorSpawnParameters SpawnParams;
-        SpawnParams.Owner = this;
-        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-        DefaultCharacter = World->SpawnActor<AcybersoulsCharacter>(DefaultCharacterClass, InitialLocation, InitialRotation, SpawnParams);
         
-        if (DefaultCharacter)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("PLAYER CONTROLLER: Default Character spawned successfully!"));
-            if (!GetPawn())
-            {
-                UE_LOG(LogTemp, Warning, TEXT("PLAYER CONTROLLER: Possessing Default Character"));
-                Possess(DefaultCharacter);
-            }
-        }
-        else
-        {
-            UE_LOG(LogTemp, Error, TEXT("PLAYER CONTROLLER: Failed to spawn Default Character!"));
-        }
+        DefaultChar->SetActorLocation(InitialLocation);
+        DefaultChar->SetActorRotation(InitialRotation);
+        
+        Possess(DefaultChar);
     }
     else
     {
-        UE_LOG(LogTemp, Error, TEXT("PLAYER CONTROLLER: DefaultCharacterClass is NULL! Please set it in the Blueprint."));
+        UE_LOG(LogTemp, Error, TEXT("PLAYER CONTROLLER: Failed to get Default Character from pool!"));
     }
     
     // Initialize state structs
     DefaultCharacterState.bIsValid = false;
     CyberStateCharacterState.bIsValid = false;
     
-    UE_LOG(LogTemp, Warning, TEXT("PLAYER CONTROLLER: Spawning complete. Default: %s"), 
-        IsValid(DefaultCharacter) ? TEXT("Valid") : TEXT("NULL"));
+    UE_LOG(LogTemp, Warning, TEXT("PLAYER CONTROLLER: Character pool initialization complete"));
 }
 
 void ACyberSoulsPlayerController::SwitchCharacter()
@@ -179,14 +169,23 @@ void ACyberSoulsPlayerController::SwitchCharacter()
 
 void ACyberSoulsPlayerController::SwitchToDefaultCharacter()
 {
-    if (!IsValid(CyberStateCharacter))
+    if (!CharacterPool)
     {
-        UE_LOG(LogTemp, Error, TEXT("SwitchToDefaultCharacter: CyberStateCharacter is not valid"));
+        UE_LOG(LogTemp, Error, TEXT("SwitchToDefaultCharacter: CharacterPool is NULL"));
         return;
     }
     
-    // Store current CyberState character state
-    StoreCharacterState(CyberStateCharacter);
+    APawn* CurrentPawn = GetPawn();
+    if (!CurrentPawn)
+    {
+        UE_LOG(LogTemp, Error, TEXT("SwitchToDefaultCharacter: No current pawn"));
+        return;
+    }
+    
+    // Store current state
+    StoreCharacterState(CurrentPawn);
+    FVector CharacterLocation = CurrentPawn->GetActorLocation();
+    FRotator CharacterRotation = CurrentPawn->GetActorRotation();
     
     // Clear all input mapping contexts before switching
     if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
@@ -200,54 +199,54 @@ void ACyberSoulsPlayerController::SwitchToDefaultCharacter()
         }
     }
     
+    // Unpossess current character
     UnPossess();
     
-    // Store location before destroying
-    FVector CharacterLocation = CyberStateCharacter->GetActorLocation();
-    FRotator CharacterRotation = CyberStateCharacter->GetActorRotation();
+    // Return cyber state character to pool
+    CharacterPool->ReturnCharacter(Cast<ACharacter>(CurrentPawn));
     
-    // Destroy CyberState character
-    CyberStateCharacter->Destroy();
-    CyberStateCharacter = nullptr;
-    
-    // Spawn or restore Default character
-    if (!IsValid(DefaultCharacter))
+    // Get default character from pool
+    if (ACharacter* DefaultChar = CharacterPool->GetCharacter(false))
     {
-        UWorld* World = GetWorld();
-        if (World && DefaultCharacterClass)
+        DefaultChar->SetActorLocation(CharacterLocation);
+        DefaultChar->SetActorRotation(CharacterRotation);
+        RestoreCharacterState(DefaultChar);
+        Possess(DefaultChar);
+        
+        bIsUsingCyberState = false;
+        OnCharacterSwitched.Broadcast(DefaultChar);
+        
+        // Show HUD notification
+        if (ACybersoulsHUD* CyberHUD = Cast<ACybersoulsHUD>(GetHUD()))
         {
-            FActorSpawnParameters SpawnParams;
-            SpawnParams.Owner = this;
-            DefaultCharacter = World->SpawnActor<AcybersoulsCharacter>(DefaultCharacterClass, CharacterLocation, CharacterRotation, SpawnParams);
+            CyberHUD->ShowCharacterSwitchNotification(TEXT("▰▰ SWITCHED TO DEFAULT MODE ▰▰"));
         }
     }
-    
-    if (IsValid(DefaultCharacter))
+    else
     {
-        RestoreCharacterState(DefaultCharacter);
-        Possess(DefaultCharacter);
-    }
-    
-    bIsUsingCyberState = false;
-    OnCharacterSwitched.Broadcast(DefaultCharacter);
-    
-    // Show HUD notification
-    if (ACybersoulsHUD* CyberHUD = Cast<ACybersoulsHUD>(GetHUD()))
-    {
-        CyberHUD->ShowCharacterSwitchNotification(TEXT("▰▰ SWITCHED TO DEFAULT MODE ▰▰"));
+        UE_LOG(LogTemp, Error, TEXT("SwitchToDefaultCharacter: Failed to get default character from pool"));
     }
 }
 
 void ACyberSoulsPlayerController::SwitchToCyberStateCharacter()
 {
-    if (!IsValid(DefaultCharacter))
+    if (!CharacterPool)
     {
-        UE_LOG(LogTemp, Error, TEXT("SwitchToCyberStateCharacter: DefaultCharacter is not valid"));
+        UE_LOG(LogTemp, Error, TEXT("SwitchToCyberStateCharacter: CharacterPool is NULL"));
         return;
     }
     
-    // Store current Default character state
-    StoreCharacterState(DefaultCharacter);
+    APawn* CurrentPawn = GetPawn();
+    if (!CurrentPawn)
+    {
+        UE_LOG(LogTemp, Error, TEXT("SwitchToCyberStateCharacter: No current pawn"));
+        return;
+    }
+    
+    // Store current state
+    StoreCharacterState(CurrentPawn);
+    FVector CharacterLocation = CurrentPawn->GetActorLocation();
+    FRotator CharacterRotation = CurrentPawn->GetActorRotation();
     
     // Clear all input mapping contexts before switching
     if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
@@ -261,41 +260,32 @@ void ACyberSoulsPlayerController::SwitchToCyberStateCharacter()
         }
     }
     
+    // Unpossess current character
     UnPossess();
     
-    // Store location before destroying
-    FVector CharacterLocation = DefaultCharacter->GetActorLocation();
-    FRotator CharacterRotation = DefaultCharacter->GetActorRotation();
+    // Return default character to pool
+    CharacterPool->ReturnCharacter(Cast<ACharacter>(CurrentPawn));
     
-    // Destroy Default character
-    DefaultCharacter->Destroy();
-    DefaultCharacter = nullptr;
-    
-    // Spawn or restore CyberState character
-    if (!IsValid(CyberStateCharacter))
+    // Get cyber state character from pool
+    if (ACharacter* CyberStateChar = CharacterPool->GetCharacter(true))
     {
-        UWorld* World = GetWorld();
-        if (World && CyberStateCharacterClass)
+        CyberStateChar->SetActorLocation(CharacterLocation);
+        CyberStateChar->SetActorRotation(CharacterRotation);
+        RestoreCharacterState(CyberStateChar);
+        Possess(CyberStateChar);
+        
+        bIsUsingCyberState = true;
+        OnCharacterSwitched.Broadcast(CyberStateChar);
+        
+        // Show HUD notification
+        if (ACybersoulsHUD* CyberHUD = Cast<ACybersoulsHUD>(GetHUD()))
         {
-            FActorSpawnParameters SpawnParams;
-            SpawnParams.Owner = this;
-            CyberStateCharacter = World->SpawnActor<APlayerCyberState>(CyberStateCharacterClass, CharacterLocation, CharacterRotation, SpawnParams);
+            CyberHUD->ShowCharacterSwitchNotification(TEXT("▰▰ SWITCHED TO CYBER STATE ▰▰"));
         }
     }
-    
-    if (IsValid(CyberStateCharacter))
+    else
     {
-        RestoreCharacterState(CyberStateCharacter);
-        Possess(CyberStateCharacter);
-    }
-    
-    bIsUsingCyberState = true;
-    OnCharacterSwitched.Broadcast(CyberStateCharacter);
-    
-    // Show HUD notification
-    if (ACybersoulsHUD* CyberHUD = Cast<ACybersoulsHUD>(GetHUD()))
-    {
-        CyberHUD->ShowCharacterSwitchNotification(TEXT("▰▰ SWITCHED TO CYBER STATE ▰▰"));
+        UE_LOG(LogTemp, Error, TEXT("SwitchToCyberStateCharacter: Failed to get cyber state character from pool"));
     }
 }
 
@@ -321,13 +311,16 @@ void ACyberSoulsPlayerController::StoreCharacterState(APawn* CharacterPawn)
     
     FCharacterState* StateToStore = nullptr;
     
-    if (CharacterPawn == DefaultCharacter)
+    if (CharacterPool)
     {
-        StateToStore = &DefaultCharacterState;
-    }
-    else if (CharacterPawn == CyberStateCharacter)
-    {
-        StateToStore = &CyberStateCharacterState;
+        if (CharacterPawn == CharacterPool->GetInactiveCharacter(false))
+        {
+            StateToStore = &DefaultCharacterState;
+        }
+        else if (CharacterPawn == CharacterPool->GetInactiveCharacter(true))
+        {
+            StateToStore = &CyberStateCharacterState;
+        }
     }
     
     if (StateToStore)
@@ -357,13 +350,16 @@ void ACyberSoulsPlayerController::RestoreCharacterState(APawn* CharacterPawn)
     
     FCharacterState* StateToRestore = nullptr;
     
-    if (CharacterPawn == DefaultCharacter)
+    if (CharacterPool)
     {
-        StateToRestore = &DefaultCharacterState;
-    }
-    else if (CharacterPawn == CyberStateCharacter)
-    {
-        StateToRestore = &CyberStateCharacterState;
+        if (CharacterPawn == CharacterPool->GetInactiveCharacter(false))
+        {
+            StateToRestore = &DefaultCharacterState;
+        }
+        else if (CharacterPawn == CharacterPool->GetInactiveCharacter(true))
+        {
+            StateToRestore = &CyberStateCharacterState;
+        }
     }
     
     if (StateToRestore && StateToRestore->bIsValid)

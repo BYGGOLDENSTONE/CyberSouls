@@ -173,17 +173,17 @@ void APlayerCyberState::Look(const FInputActionValue& Value)
 
 void APlayerCyberState::TryJump()
 {
-    if (DoubleJumpComponent && DoubleJumpComponent->CanPerformAbility())
+    if (DoubleJumpComponent && DoubleJumpComponent->CanActivateAbility())
     {
-        DoubleJumpComponent->PerformAbility();
+        DoubleJumpComponent->ActivateAbility();
     }
 }
 
 void APlayerCyberState::TryDash()
 {
-    if (DashComponent && DashComponent->CanPerformAbility())
+    if (DashComponent && DashComponent->CanActivateAbility())
     {
-        DashComponent->PerformAbility();
+        DashComponent->ActivateAbility();
     }
 }
 

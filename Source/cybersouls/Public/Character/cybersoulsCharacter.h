@@ -88,6 +88,9 @@ class AcybersoulsCharacter : public ACharacter
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
 	class UQuickHackManagerComponent* QuickHackManager;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Components, meta = (AllowPrivateAccess = "true"))
+	class UTargetingComponent* TargetingComponent;
 
 
 public:
@@ -118,9 +121,7 @@ protected:
 	/** Called for character switch input */
 	void OnSwitchCharacter();
 
-	/** Crosshair-based aiming */
-	void UpdateCrosshairTarget();
-	void DetermineCrosshairBodyPart(const FHitResult& HitResult);
+	// Crosshair targeting now handled by TargetingComponent
 	
 public:
 	AActor* GetCrosshairTarget() const;
@@ -160,12 +161,6 @@ private:
 	// Camera view state
 	bool bIsFirstPersonView = false;
 	
-	// Crosshair targeting
-	AActor* CrosshairTarget = nullptr;
-	EBodyPart CrosshairBodyPart = EBodyPart::UpperBody;
-	
-	// Crosshair settings
-	UPROPERTY(EditAnywhere, Category = "Crosshair")
-	float CrosshairRange = 2000.0f;
+	// Crosshair logic moved to TargetingComponent
 };
 

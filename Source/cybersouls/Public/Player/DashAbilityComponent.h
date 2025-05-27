@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/ActorComponent.h"
+#include "cybersouls/Public/Abilities/BaseAbilityComponent.h"
 #include "DashAbilityComponent.generated.h"
 
 class UPlayerCyberStateAttributeComponent;
@@ -14,7 +14,7 @@ class UPlayerCyberStateAttributeComponent;
  * or forward if no input is provided.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class CYBERSOULS_API UDashAbilityComponent : public UActorComponent
+class CYBERSOULS_API UDashAbilityComponent : public UBaseAbilityComponent
 {
     GENERATED_BODY()
 
@@ -30,8 +30,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability")
     float DashDuration = 0.2f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability")
-    float DashCooldown = 0.5f;
+    // DashCooldown moved to base class Cooldown property
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ability")
     bool bCanDashInAir = true;
@@ -48,9 +47,6 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "Charges")
     float ChargeRegenTimer;
     
-    UPROPERTY(BlueprintReadOnly, Category = "Ability")
-    float CooldownTimeRemaining;
-
     /**
      * Check if the dash ability can be performed
      * 
@@ -58,8 +54,7 @@ public:
      * 
      * @return True if all conditions are met for dashing
      */
-    UFUNCTION(BlueprintCallable, Category = "Ability")
-    bool CanPerformAbility() const;
+    virtual bool CanActivateAbility() override;
 
     /**
      * Execute the dash ability
@@ -67,8 +62,12 @@ public:
      * Consumes stamina and initiates the dash movement if conditions are met.
      * The dash direction is based on current movement input or facing direction.
      */
-    UFUNCTION(BlueprintCallable, Category = "Ability")
-    void PerformAbility();
+    virtual void ActivateAbility() override;
+    
+    /**
+     * End the dash ability
+     */
+    virtual void DeactivateAbility() override;
 
     UFUNCTION(BlueprintCallable, Category = "Charges")
     int32 GetCurrentCharges() const { return CurrentCharges; }

@@ -8,6 +8,10 @@ UDoubleJumpAbilityComponent::UDoubleJumpAbilityComponent()
 {
     PrimaryComponentTick.bCanEverTick = false;
     CurrentJumpsInAir = 0;
+    
+    // Set base ability properties
+    AbilityName = "Double Jump";
+    Cooldown = 0.0f; // No cooldown for double jump
 }
 
 void UDoubleJumpAbilityComponent::BeginPlay()
@@ -22,7 +26,7 @@ void UDoubleJumpAbilityComponent::BeginPlay()
     }
 }
 
-bool UDoubleJumpAbilityComponent::CanPerformAbility() const
+bool UDoubleJumpAbilityComponent::CanActivateAbility()
 {
     if (!IsValid(OwnerCharacter) || !IsValid(AttributeComponent))
     {
@@ -50,9 +54,9 @@ bool UDoubleJumpAbilityComponent::CanPerformAbility() const
     return AttributeComponent->HasEnoughStamina(StaminaCost);
 }
 
-void UDoubleJumpAbilityComponent::PerformAbility()
+void UDoubleJumpAbilityComponent::ActivateAbility()
 {
-    if (!CanPerformAbility())
+    if (!CanActivateAbility())
     {
         return;
     }
@@ -97,4 +101,9 @@ void UDoubleJumpAbilityComponent::OnMovementModeChanged(ACharacter* Character, E
             ResetJumpCount();
         }
     }
+}
+
+void UDoubleJumpAbilityComponent::DeactivateAbility()
+{
+    // Double jump doesn't need deactivation logic
 }

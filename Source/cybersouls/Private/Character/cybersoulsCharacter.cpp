@@ -18,6 +18,7 @@
 #include "cybersouls/Public/Abilities/PassiveAbilityComponent.h"
 #include "cybersouls/Public/Abilities/BaseAbilityComponent.h"
 #include "cybersouls/Public/Combat/BodyPartComponent.h"
+#include "cybersouls/Public/Components/TargetingComponent.h"
 #include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "cybersouls/Public/Player/CyberSoulsPlayerController.h"
 #include "cybersouls/Public/Game/cybersoulsGameMode.h"
@@ -72,6 +73,7 @@ AcybersoulsCharacter::AcybersoulsCharacter()
 	PlayerProgression = CreateDefaultSubobject<UPlayerProgressionComponent>(TEXT("PlayerProgression"));
 	SlashAbility = CreateDefaultSubobject<USlashAbilityComponent>(TEXT("SlashAbility"));
 	QuickHackManager = CreateDefaultSubobject<UQuickHackManagerComponent>(TEXT("QuickHackManager"));
+	TargetingComponent = CreateDefaultSubobject<UTargetingComponent>(TEXT("TargetingComponent"));
 }
 
 void AcybersoulsCharacter::BeginPlay()
@@ -86,6 +88,12 @@ void AcybersoulsCharacter::BeginPlay()
 	}
 	
 	// QuickHacks are now managed by QuickHackManager
+	
+	// Setup targeting component
+	if (TargetingComponent && FollowCamera)
+	{
+		TargetingComponent->SetCameraComponent(FollowCamera);
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -269,58 +277,10 @@ void AcybersoulsCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	
-	// Update crosshair targeting
-	UpdateCrosshairTarget();
+	// Crosshair targeting is now handled by TargetingComponent
 }
 
-void AcybersoulsCharacter::UpdateCrosshairTarget()
-{
-	// Get camera and controller
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC || !FollowCamera)
-	{
-		CrosshairTarget = nullptr;
-		return;
-	}
-
-	// Get screen center for crosshair position
-	int32 ViewportSizeX, ViewportSizeY;
-	PC->GetViewportSize(ViewportSizeX, ViewportSizeY);
-	FVector2D CrosshairLocation(ViewportSizeX * 0.5f, ViewportSizeY * 0.5f);
-
-	// Convert screen position to world ray
-	FVector WorldLocation, WorldDirection;
-	if (PC->DeprojectScreenPositionToWorld(CrosshairLocation.X, CrosshairLocation.Y, WorldLocation, WorldDirection))
-	{
-		// Perform line trace from camera
-		FVector TraceStart = FollowCamera->GetComponentLocation();
-		FVector TraceEnd = TraceStart + (WorldDirection * CrosshairRange);
-
-		FHitResult HitResult;
-		FCollisionQueryParams TraceParams;
-		TraceParams.AddIgnoredActor(this);
-
-		if (GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Pawn, TraceParams))
-		{
-			// Check if hit actor is an enemy
-			if (ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(HitResult.GetActor()))
-			{
-				CrosshairTarget = Enemy;
-				
-				// Determine body part based on hit location
-				DetermineCrosshairBodyPart(HitResult);
-			}
-			else
-			{
-				CrosshairTarget = nullptr;
-			}
-		}
-		else
-		{
-			CrosshairTarget = nullptr;
-		}
-	}
-}
+// UpdateCrosshairTarget removed - now handled by TargetingComponent
 
 
 
@@ -356,55 +316,16 @@ void AcybersoulsCharacter::UseQuickHack4()
 	}
 }
 
-void AcybersoulsCharacter::DetermineCrosshairBodyPart(const FHitResult& HitResult)
-{
-	if (!HitResult.GetActor())
-	{
-		return;
-	}
-
-	ACybersoulsEnemyBase* Enemy = Cast<ACybersoulsEnemyBase>(HitResult.GetActor());
-	if (!Enemy)
-	{
-		return;
-	}
-
-	// Get hit location and actor center
-	FVector HitLocation = HitResult.Location;
-	FVector ActorLocation = Enemy->GetActorLocation();
-	FVector Origin, BoxExtent;
-	Enemy->GetActorBounds(false, Origin, BoxExtent);
-
-	// Determine body part based on hit height relative to actor
-	float RelativeHeight = HitLocation.Z - ActorLocation.Z;
-	
-	if (RelativeHeight > BoxExtent.Z * 0.3f)
-	{
-		CrosshairBodyPart = EBodyPart::UpperBody;
-	}
-	else
-	{
-		// Determine left or right leg based on Y position
-		float RelativeY = HitLocation.Y - ActorLocation.Y;
-		if (RelativeY > 0)
-		{
-			CrosshairBodyPart = EBodyPart::RightLeg;
-		}
-		else
-		{
-			CrosshairBodyPart = EBodyPart::LeftLeg;
-		}
-	}
-}
+// DetermineCrosshairBodyPart removed - now handled by TargetingComponent
 
 AActor* AcybersoulsCharacter::GetCrosshairTarget() const
 {
-	return CrosshairTarget;
+	return TargetingComponent ? TargetingComponent->GetCurrentTarget() : nullptr;
 }
 
 EBodyPart AcybersoulsCharacter::GetCrosshairBodyPart() const
 {
-	return CrosshairBodyPart;
+	return TargetingComponent ? TargetingComponent->GetTargetBodyPart() : EBodyPart::None;
 }
 
 void AcybersoulsCharacter::HandlePlayerDeath()

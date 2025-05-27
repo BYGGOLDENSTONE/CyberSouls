@@ -12,9 +12,12 @@ UDashAbilityComponent::UDashAbilityComponent()
     PrimaryComponentTick.bCanEverTick = true;
     bIsDashing = false;
     DashTimeRemaining = 0.0f;
-    CooldownTimeRemaining = 0.0f;
     CurrentCharges = 1;
     ChargeRegenTimer = 0.0f;
+    
+    // Set base ability properties
+    AbilityName = "Dash";
+    Cooldown = 0.5f;
 }
 
 void UDashAbilityComponent::BeginPlay()
@@ -44,11 +47,7 @@ void UDashAbilityComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
     // Handle cooldown and charge regeneration
     if (OwnerCharacter)
     {
-        // Cooldown always continues regardless of position
-        if (CooldownTimeRemaining > 0.0f)
-        {
-            CooldownTimeRemaining -= DeltaTime;
-        }
+        // Cooldown is now handled by base class
         
         UCharacterMovementComponent* Movement = OwnerCharacter->GetCharacterMovement();
         if (Movement && Movement->IsMovingOnGround())
@@ -69,7 +68,7 @@ void UDashAbilityComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
     }
 }
 
-bool UDashAbilityComponent::CanPerformAbility() const
+bool UDashAbilityComponent::CanActivateAbility()
 {
     if (!IsValid(OwnerCharacter) || !IsValid(AttributeComponent))
     {
@@ -82,7 +81,7 @@ bool UDashAbilityComponent::CanPerformAbility() const
         return false;
     }
 
-    if (bIsDashing || CooldownTimeRemaining > 0.0f)
+    if (bIsDashing || CurrentCooldown > 0.0f)
     {
         return false;
     }
@@ -101,9 +100,9 @@ bool UDashAbilityComponent::CanPerformAbility() const
     return AttributeComponent->HasEnoughStamina(StaminaCost);
 }
 
-void UDashAbilityComponent::PerformAbility()
+void UDashAbilityComponent::ActivateAbility()
 {
-    if (!CanPerformAbility())
+    if (!CanActivateAbility())
     {
         return;
     }
@@ -198,7 +197,7 @@ void UDashAbilityComponent::UpdateDash(float DeltaTime)
 void UDashAbilityComponent::EndDash()
 {
     bIsDashing = false;
-    CooldownTimeRemaining = DashCooldown;
+    CurrentCooldown = Cooldown;
     
     UCharacterMovementComponent* Movement = OwnerCharacter->GetCharacterMovement();
     if (Movement)
@@ -222,4 +221,12 @@ void UDashAbilityComponent::ResetCharges()
 {
     CurrentCharges = MaxCharges;
     ChargeRegenTimer = 0.0f;
+}
+
+void UDashAbilityComponent::DeactivateAbility()
+{
+    if (bIsDashing)
+    {
+        EndDash();
+    }
 }

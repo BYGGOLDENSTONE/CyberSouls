@@ -55,14 +55,11 @@ protected:
 
 private:
     UPROPERTY()
-    AcybersoulsCharacter* DefaultCharacter;
-
-    UPROPERTY()
-    APlayerCyberState* CyberStateCharacter;
+    class ACharacterPoolManager* CharacterPool;
 
     bool bIsUsingCyberState;
 
-    void SpawnCharacters();
+    void InitializeCharacterPool();
     void SwitchToDefaultCharacter();
     void SwitchToCyberStateCharacter();
     void TransferCameraSettings(APawn* FromPawn, APawn* ToPawn);

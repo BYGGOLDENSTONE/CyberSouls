@@ -687,9 +687,9 @@ void ACybersoulsHUD::DrawDashCharges()
 	}
 
 	// Draw cooldown if in cooldown
-	if (DashComponent->CooldownTimeRemaining > 0.0f)
+	if (DashComponent->CurrentCooldown > 0.0f)
 	{
-		FString CooldownText = FString::Printf(TEXT("Cooldown: %.1fs"), DashComponent->CooldownTimeRemaining);
+		FString CooldownText = FString::Printf(TEXT("Cooldown: %.1fs"), DashComponent->CurrentCooldown);
 		DrawText(CooldownText, FColor::Red, StartX + 300.0f, StartY, HUDFont);
 	}
 }

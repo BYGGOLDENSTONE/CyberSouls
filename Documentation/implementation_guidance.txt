@@ -1,0 +1,325 @@
+# CYBERSOULS IMPLEMENTATION GUIDANCE
+For: Claude Code Implementation Terminal
+Generated: 5/25/2025
+
+## OVERVIEW
+This document provides step-by-step implementation guidance for fixing the issues identified in master.txt. Follow these instructions in order to systematically address the architectural violations, code duplication, and other issues.
+
+## PHASE 1: CRITICAL ARCHITECTURE FIXES (Priority: IMMEDIATE)
+
+### 1. Fix Movement Ability Inheritance
+
+**Files to modify:**
+- Source/cybersouls/Public/Player/DashAbilityComponent.h
+- Source/cybersouls/Public/Player/DoubleJumpAbilityComponent.h
+- Source/cybersouls/Private/Player/DashAbilityComponent.cpp
+- Source/cybersouls/Private/Player/DoubleJumpAbilityComponent.cpp
+
+**Steps:**
+1. Make both classes inherit from UBaseAbilityComponent
+2. Remove duplicate cooldown/activation logic
+3. Rename PerformAbility() to ActivateAbility() for consistency
+4. Use base class CanActivateAbility() pattern
+5. Add UPROPERTY macros to all hardcoded values
+
+**Example change for DashAbilityComponent.h:**
+```cpp
+// Change from:
+class CYBERSOULS_API UDashAbilityComponent : public UActorComponent
+
+// To:
+class CYBERSOULS_API UDashAbilityComponent : public UBaseAbilityComponent
+```
+
+### 2. Create Component Interfaces
+
+**Files to create:**
+- Source/cybersouls/Public/Interfaces/TargetableInterface.h
+- Source/cybersouls/Public/Interfaces/AbilityInterface.h
+- Source/cybersouls/Public/Interfaces/AttributeInterface.h
+- Source/cybersouls/Public/Interfaces/DamageableInterface.h
+
+**Implementation:**
+```cpp
+// TargetableInterface.h
+UINTERFACE(MinimalAPI)
+class UTargetableInterface : public UInterface
+{
+    GENERATED_BODY()
+};
+
+class CYBERSOULS_API ITargetableInterface
+{
+    GENERATED_BODY()
+public:
+    virtual FVector GetTargetLocation() const = 0;
+    virtual bool IsValidTarget() const = 0;
+    virtual EBodyPart GetTargetBodyPart(const FVector& HitLocation) const = 0;
+};
+```
+
+### 3. Extract Crosshair Logic to TargetingComponent
+
+**Files to modify:**
+- Source/cybersouls/Public/Character/cybersoulsCharacter.h
+- Source/cybersouls/Private/Character/cybersoulsCharacter.cpp
+
+**Files to create:**
+- Source/cybersouls/Public/Combat/TargetingComponent.h
+- Source/cybersouls/Private/Combat/TargetingComponent.cpp
+
+**Steps:**
+1. Create UTargetingComponent class
+2. Move UpdateCrosshairTarget() and related methods from character
+3. Move crosshair-related properties (CrosshairRange, CrosshairTarget, etc.)
+4. Add component to character in constructor
+5. Update all references to use component
+
+### 4. Implement Character Pooling
+
+**Files to modify:**
+- Source/cybersouls/Public/Player/CyberSoulsPlayerController.h
+- Source/cybersouls/Private/Player/CyberSoulsPlayerController.cpp
+
+**Files to create:**
+- Source/cybersouls/Public/Player/CharacterPoolManager.h
+- Source/cybersouls/Private/Player/CharacterPoolManager.cpp
+
+**Steps:**
+1. Create CharacterPoolManager to pre-spawn characters
+2. Hide inactive character instead of destroying
+3. Swap active/inactive on switch
+4. Preserve component states between switches
+
+### 5. Create Attribute Component Hierarchy
+
+**Files to modify:**
+- Source/cybersouls/Public/Attributes/AttributeComponent.h
+- Source/cybersouls/Public/Attributes/PlayerAttributeComponent.h
+- Source/cybersouls/Public/Attributes/PlayerCyberStateAttributeComponent.h
+- Source/cybersouls/Public/Attributes/EnemyAttributeComponent.h
+
+**Steps:**
+1. Make all attribute components inherit from UAttributeComponent
+2. Move common functionality to base class
+3. Create unified death delegate system
+4. Standardize attribute modification methods
+
+## PHASE 2: CODE ORGANIZATION
+
+### 1. Extract Hardcoded Values
+
+**For each component file:**
+1. Find all hardcoded numeric values
+2. Add UPROPERTY(EditDefaultsOnly) declarations in header
+3. Move values to header as default values
+4. Ensure Blueprint can override
+
+**Example for DashAbilityComponent.h:**
+```cpp
+UPROPERTY(EditDefaultsOnly, Category = "Dash")
+float DashDistance = 1000.0f;
+
+UPROPERTY(EditDefaultsOnly, Category = "Dash")
+float DashDuration = 0.2f;
+
+UPROPERTY(EditDefaultsOnly, Category = "Dash")
+float StaminaCost = 25.0f;
+```
+
+### 2. Create Service Classes
+
+**Files to create:**
+- Source/cybersouls/Public/Services/TargetingService.h
+- Source/cybersouls/Public/Services/DamageService.h
+- Source/cybersouls/Public/Services/AbilityService.h
+
+**TargetingService responsibilities:**
+- Find targets in range
+- Validate target visibility
+- Determine body parts
+- Handle target locking
+
+**DamageService responsibilities:**
+- Apply damage with modifiers
+- Handle damage events
+- Check immunities/resistances
+- Trigger death sequences
+
+### 3. Implement Event System
+
+**Add to each component:**
+```cpp
+// Ability events
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnAbilityActivated, UBaseAbilityComponent*);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnAbilityDeactivated, UBaseAbilityComponent*);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnCooldownComplete, UBaseAbilityComponent*);
+
+// Damage events
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnDamageDealt, float, AActor*);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnDamageReceived, float, AActor*);
+
+// State events
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnCharacterSwitched, ACharacter*);
+```
+
+### 4. Move Save/Load Logic
+
+**Files to modify:**
+- Source/cybersouls/Private/Attributes/PlayerProgressionComponent.cpp
+
+**Files to create:**
+- Source/cybersouls/Public/Save/CybersoulsSaveGame.h
+- Source/cybersouls/Private/Save/CybersoulsSaveGame.cpp
+
+**Steps:**
+1. Create USaveGame subclass
+2. Move save/load methods to GameInstance
+3. Have ProgressionComponent only store/retrieve data
+
+### 5. Centralize Death Effects
+
+**Files to create:**
+- Source/cybersouls/Public/Effects/DeathEffectComponent.h
+- Source/cybersouls/Private/Effects/DeathEffectComponent.cpp
+
+**Steps:**
+1. Extract CreateShatteredPieces() from CybersoulsEnemyBase
+2. Make all parameters configurable
+3. Add to enemies as component
+4. Trigger via death event
+
+## PHASE 3: REMOVE CODE DUPLICATION
+
+### 1. Unify Target Finding
+
+**Create utility class:**
+```cpp
+// CybersoulsUtils.h
+class CYBERSOULS_API UCybersoulsUtils : public UBlueprintFunctionLibrary
+{
+    UFUNCTION(BlueprintCallable, Category = "Targeting")
+    static AActor* FindNearestTarget(AActor* Source, float Range, TSubclassOf<AActor> TargetClass);
+    
+    UFUNCTION(BlueprintCallable, Category = "Targeting")
+    static TArray<AActor*> FindTargetsInRange(AActor* Source, float Range, float Angle);
+};
+```
+
+### 2. Create Base Classes for Ability Types
+
+**Files to create:**
+- Source/cybersouls/Public/Abilities/MovementAbilityComponent.h
+- Source/cybersouls/Public/Abilities/ChargeBasedAbilityComponent.h
+- Source/cybersouls/Public/Abilities/ContinuousAbilityComponent.h
+
+**MovementAbilityComponent:**
+```cpp
+class CYBERSOULS_API UMovementAbilityComponent : public UBaseAbilityComponent
+{
+protected:
+    UPROPERTY(EditDefaultsOnly, Category = "Resource")
+    float StaminaCost = 20.0f;
+    
+    virtual bool HasRequiredResources() const;
+    virtual void ConsumeResources();
+};
+```
+
+### 3. Standardize UI Drawing
+
+**Create HUD utility methods:**
+```cpp
+// CybersoulsHUD.h
+protected:
+    void DrawBorderedRect(float X, float Y, float Width, float Height, FLinearColor BorderColor);
+    void DrawProgressBar(float X, float Y, float Width, float Height, float Progress, FLinearColor Color);
+    void DrawCenteredText(const FString& Text, float Y, float Scale = 1.0f);
+```
+
+## PHASE 4: AI AND ENEMY SYSTEM FIXES
+
+### 1. Create Data Assets for Configuration
+
+**Files to create:**
+- Source/cybersouls/Public/Data/EnemyConfigData.h
+- Source/cybersouls/Public/Data/AIBehaviorData.h
+
+**Steps:**
+1. Create UDataAsset subclasses
+2. Move all hardcoded AI values to data assets
+3. Reference data assets in enemy blueprints
+
+### 2. Implement AI State Machine
+
+**Replace boolean flags with state enum:**
+```cpp
+UENUM(BlueprintType)
+enum class EAIState : uint8
+{
+    Idle,
+    Patrolling,
+    Alerted,
+    InCombat,
+    Searching,
+    Dead
+};
+```
+
+### 3. Use AIPerception Component
+
+**Modify BaseEnemyAIController:**
+1. Add UAIPerceptionComponent
+2. Configure sight and hearing senses
+3. Remove manual line trace detection
+4. Use perception events
+
+## IMPLEMENTATION ORDER
+
+1. **Day 1-2:** Fix movement ability inheritance and create interfaces
+2. **Day 3-4:** Extract crosshair logic and implement character pooling
+3. **Day 5-6:** Create attribute hierarchy and extract hardcoded values
+4. **Day 7-8:** Create service classes and implement event system
+5. **Day 9-10:** Remove code duplication and create base classes
+6. **Day 11-12:** Fix AI system and create data assets
+7. **Day 13-14:** Testing and bug fixes
+
+## TESTING REQUIREMENTS
+
+After each change:
+1. Compile and fix any errors
+2. Test in PIE (Play In Editor)
+3. Verify abilities still function
+4. Check character switching works
+5. Ensure enemies behave correctly
+6. Validate UI displays properly
+
+## COMMON PITFALLS TO AVOID
+
+1. Don't break existing functionality while refactoring
+2. Maintain Blueprint compatibility where possible
+3. Update all references when moving code
+4. Test multiplayer implications if applicable
+5. Preserve save game compatibility
+
+## VERIFICATION CHECKLIST
+
+- [ ] All movement abilities inherit from BaseAbilityComponent
+- [ ] No FindComponentByClass calls remain
+- [ ] All hardcoded values are UPROPERTY
+- [ ] Crosshair logic moved to TargetingComponent
+- [ ] Character pooling implemented
+- [ ] Death effects in separate component
+- [ ] Service classes created and used
+- [ ] Event system implemented
+- [ ] Code duplication eliminated
+- [ ] AI using state machine
+- [ ] Data assets for configuration
+
+## NOTES FOR IMPLEMENTATION
+
+- Start with Phase 1 as it's most critical
+- Each phase builds on the previous
+- Maintain a working build at all times
+- Commit after each successful change
+- Document any deviations from this guide
