@@ -1,7 +1,9 @@
 // PlayerProgressionComponent.cpp
 
 #include "cybersouls/Public/Attributes/PlayerProgressionComponent.h"
+#include "cybersouls/Public/SaveGame/CybersoulsSaveGame.h"
 #include "Engine/Engine.h"
+#include "Kismet/GameplayStatics.h"
 
 UPlayerProgressionComponent::UPlayerProgressionComponent()
 {
@@ -52,14 +54,66 @@ void UPlayerProgressionComponent::AddHackingXP(float Amount)
 
 void UPlayerProgressionComponent::SaveProgression()
 {
-	// TODO: Implement save system when needed
-	UE_LOG(LogTemp, Log, TEXT("Progression saved - Integrity XP: %f, Hacking XP: %f"), IntegrityXP, HackingXP);
+	// Safety check
+	if (!IsValid(this))
+	{
+		UE_LOG(LogTemp, Error, TEXT("[XP SAVE] SaveProgression called on invalid component"));
+		return;
+	}
+	
+	// Create or get existing save game object
+	UCybersoulsSaveGame* SaveGameInstance = Cast<UCybersoulsSaveGame>(UGameplayStatics::CreateSaveGameObject(UCybersoulsSaveGame::StaticClass()));
+	
+	if (SaveGameInstance)
+	{
+		// Store current XP values with validation
+		SaveGameInstance->IntegrityXP = FMath::Max(0.0f, IntegrityXP);
+		SaveGameInstance->HackingXP = FMath::Max(0.0f, HackingXP);
+		
+		// Save to disk
+		if (UGameplayStatics::SaveGameToSlot(SaveGameInstance, UCybersoulsSaveGame::SaveSlotName, UCybersoulsSaveGame::UserIndex))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[XP SAVE] Progression saved successfully - Integrity XP: %f, Hacking XP: %f"), IntegrityXP, HackingXP);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("[XP SAVE] Failed to save progression to disk"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[XP SAVE] Failed to create save game instance"));
+	}
 }
 
 void UPlayerProgressionComponent::LoadProgression()
 {
-	// TODO: Implement load system when needed
-	UE_LOG(LogTemp, Log, TEXT("Progression loaded - Integrity XP: %f, Hacking XP: %f"), IntegrityXP, HackingXP);
+	// Try to load existing save game
+	UCybersoulsSaveGame* LoadGameInstance = Cast<UCybersoulsSaveGame>(UGameplayStatics::LoadGameFromSlot(UCybersoulsSaveGame::SaveSlotName, UCybersoulsSaveGame::UserIndex));
+	
+	if (LoadGameInstance)
+	{
+		// Restore XP values
+		IntegrityXP = LoadGameInstance->IntegrityXP;
+		HackingXP = LoadGameInstance->HackingXP;
+		
+		// Broadcast events to update UI
+		OnIntegrityXPChanged.Broadcast(IntegrityXP);
+		OnHackingXPChanged.Broadcast(HackingXP);
+		
+		UE_LOG(LogTemp, Warning, TEXT("[XP LOAD] Progression loaded successfully - Integrity XP: %f, Hacking XP: %f"), IntegrityXP, HackingXP);
+		
+		// Force UI update
+		if (IntegrityXP > 0.0f || HackingXP > 0.0f)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[XP LOAD] XP values restored from save!"));
+		}
+	}
+	else
+	{
+		// No save game exists yet, start with 0 XP
+		UE_LOG(LogTemp, Warning, TEXT("[XP LOAD] No save game found, starting with 0 XP"));
+	}
 }
 
 void UPlayerProgressionComponent::ResetProgression()

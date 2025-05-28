@@ -5,6 +5,7 @@
 #include "cybersouls/Public/Input/CyberSoulsInputConfig.h"
 #include "cybersouls/Public/UI/CybersoulsHUD.h"
 #include "cybersouls/Public/Game/cybersoulsGameMode.h"
+#include "cybersouls/Public/AI/BaseEnemyAIController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/World.h"
@@ -13,6 +14,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "GameFramework/PlayerStart.h"
+#include "EngineUtils.h"
 
 ACyberSoulsPlayerController::ACyberSoulsPlayerController()
 {
@@ -26,6 +28,35 @@ void ACyberSoulsPlayerController::BeginPlay()
     Super::BeginPlay();
     
     UE_LOG(LogTemp, Warning, TEXT("CYBER SOULS PLAYER CONTROLLER: BeginPlay called"));
+    
+    // Set initial input mode based on settings
+    if (bEnableMouseInGameplay)
+    {
+        bShowMouseCursor = true;
+        bEnableClickEvents = true;
+        bEnableMouseOverEvents = true;
+        
+        if (bUseGameAndUIInputMode)
+        {
+            FInputModeGameAndUI InputMode;
+            InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockInFullscreen);
+            InputMode.SetHideCursorDuringCapture(false);
+            SetInputMode(InputMode);
+        }
+        else
+        {
+            FInputModeGameOnly InputMode;
+            SetInputMode(InputMode);
+        }
+    }
+    else
+    {
+        bShowMouseCursor = false;
+        bEnableClickEvents = false;
+        bEnableMouseOverEvents = false;
+        FInputModeGameOnly InputMode;
+        SetInputMode(InputMode);
+    }
     
     // Add controller input mapping context
     if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
@@ -216,6 +247,9 @@ void ACyberSoulsPlayerController::SwitchToDefaultCharacter()
         bIsUsingCyberState = false;
         OnCharacterSwitched.Broadcast(DefaultChar);
         
+        // Update all AI controllers to track the new player character
+        UpdateAllAIControllers();
+        
         // Show HUD notification
         if (ACybersoulsHUD* CyberHUD = Cast<ACybersoulsHUD>(GetHUD()))
         {
@@ -276,6 +310,9 @@ void ACyberSoulsPlayerController::SwitchToCyberStateCharacter()
         
         bIsUsingCyberState = true;
         OnCharacterSwitched.Broadcast(CyberStateChar);
+        
+        // Update all AI controllers to track the new player character
+        UpdateAllAIControllers();
         
         // Show HUD notification
         if (ACybersoulsHUD* CyberHUD = Cast<ACybersoulsHUD>(GetHUD()))
@@ -436,10 +473,11 @@ void ACyberSoulsPlayerController::HandleRestartInput()
 
 void ACyberSoulsPlayerController::HandleShowXPInput()
 {
+    // Tab key now opens inventory (which shows XP)
     if (ACybersoulsHUD* CyberHUD = Cast<ACybersoulsHUD>(GetHUD()))
     {
-        CyberHUD->TogglePersistentXPDisplay();
-        UE_LOG(LogTemp, Warning, TEXT("HandleShowXPInput: Toggled XP display"));
+        CyberHUD->ToggleInventoryDisplay();
+        UE_LOG(LogTemp, Warning, TEXT("HandleShowXPInput: Toggled inventory display (Tab key)"));
     }
     else
     {
@@ -449,13 +487,28 @@ void ACyberSoulsPlayerController::HandleShowXPInput()
 
 void ACyberSoulsPlayerController::HandleOpenInventoryInput()
 {
-    if (ACybersoulsHUD* CyberHUD = Cast<ACybersoulsHUD>(GetHUD()))
+    // Note: This function is kept for compatibility but E key functionality has been moved to Tab
+    // The actual inventory is now opened via HandleShowXPInput (Tab key)
+    UE_LOG(LogTemp, Warning, TEXT("HandleOpenInventoryInput: E key pressed (legacy - use Tab instead)"));
+}
+
+void ACyberSoulsPlayerController::UpdateAllAIControllers()
+{
+    UWorld* World = GetWorld();
+    if (!World)
     {
-        CyberHUD->ToggleInventoryDisplay();
-        UE_LOG(LogTemp, Warning, TEXT("HandleOpenInventoryInput: Toggled inventory display"));
+        return;
     }
-    else
+    
+    // Find all AI controllers and update their player targets
+    for (TActorIterator<ABaseEnemyAIController> ActorIterator(World); ActorIterator; ++ActorIterator)
     {
-        UE_LOG(LogTemp, Error, TEXT("HandleOpenInventoryInput: HUD is not valid"));
+        ABaseEnemyAIController* AIController = *ActorIterator;
+        if (IsValid(AIController))
+        {
+            AIController->UpdatePlayerTarget();
+        }
     }
+    
+    UE_LOG(LogTemp, Warning, TEXT("Updated all AI controllers to track new player character"));
 }

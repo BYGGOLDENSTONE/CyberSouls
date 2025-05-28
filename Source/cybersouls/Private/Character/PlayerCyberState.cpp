@@ -2,6 +2,7 @@
 #include "cybersouls/Public/Player/PlayerCyberStateAttributeComponent.h"
 #include "cybersouls/Public/Player/DoubleJumpAbilityComponent.h"
 #include "cybersouls/Public/Player/DashAbilityComponent.h"
+#include "cybersouls/Public/Components/TargetingComponent.h"
 #include "cybersouls/Public/Player/CyberSoulsPlayerController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/CameraComponent.h"
@@ -18,6 +19,7 @@ APlayerCyberState::APlayerCyberState()
     AttributeComponent = CreateDefaultSubobject<UPlayerCyberStateAttributeComponent>(TEXT("AttributeComponent"));
     DoubleJumpComponent = CreateDefaultSubobject<UDoubleJumpAbilityComponent>(TEXT("DoubleJumpComponent"));
     DashComponent = CreateDefaultSubobject<UDashAbilityComponent>(TEXT("DashComponent"));
+    TargetingComponent = CreateDefaultSubobject<UTargetingComponent>(TEXT("TargetingComponent"));
 
     GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 

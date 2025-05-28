@@ -7,7 +7,7 @@
 
 # Un-ignore CLAUDE.md for project documentation
 !CLAUDE.md
-
+!DETAILEDCLAUDE.md
 # Un-ignore documentation files
 !*.md
 !Documentation/

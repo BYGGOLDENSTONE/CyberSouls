@@ -1,5 +1,6 @@
 // CybersoulsHUD.cpp
 #include "cybersouls/Public/UI/CybersoulsHUD.h"
+#include "cybersouls/Public/UI/InventoryWidget.h"
 #include "cybersouls/Public/Character/cybersoulsCharacter.h"
 #include "cybersouls/Public/Character/PlayerCyberState.h"
 #include "cybersouls/Public/Player/CyberSoulsPlayerController.h"
@@ -36,10 +37,25 @@ ACybersoulsHUD::ACybersoulsHUD()
 	bShowPlayAgainButton = false;
 	bShowSwitchNotification = false;
 	SwitchNotificationTimer = 0.0f;
+	InventoryWidget = nullptr;
 	
 	// Initialize inventory selection
 	SelectedQuickHackSlot = 0;
 	SelectedPassiveSlot = 0;
+	
+	// Initialize mouse interaction
+	LastMousePosition = FVector2D::ZeroVector;
+	bMouseButtonPressed = false;
+	
+	// Initialize dropdown system
+	bShowQuickHackDropdown = false;
+	bShowPassiveDropdown = false;
+	ActiveDropdownSlot = -1;
+	DropdownStartY = 0.0f;
+	DropdownItemHeight = 25.0f;
+	
+	// Initialize available abilities
+	InitializeAvailableAbilities();
 }
 
 void ACybersoulsHUD::BeginPlay()
@@ -56,6 +72,12 @@ void ACybersoulsHUD::DrawHUD()
 	if (!Canvas || !IsValid(CyberSoulsController))
 	{
 		return;
+	}
+	
+	// Canvas-based inventory display (always visible when toggled)
+	if (bShowInventoryDisplay)
+	{
+		DrawCanvasInventory();
 	}
 
 	// Update character references based on current possession
@@ -74,8 +96,7 @@ void ACybersoulsHUD::DrawHUD()
 	// Draw common elements
 	DrawCrosshair();
 	DrawXPDisplay();
-	DrawPersistentXPDisplay();
-	DrawInventoryDisplay();
+	// Removed DrawPersistentXPDisplay - XP now shown in inventory
 	DrawDeathScreen();
 	DrawPlayAgainButton();
 	DrawCharacterIndicator();
@@ -167,20 +188,15 @@ void ACybersoulsHUD::DrawQuickHackStatus()
 	float LineHeight = 25.0f;
 	
 	UQuickHackManagerComponent* QuickHackManager = PlayerCharacter->GetQuickHackManager();
-	TArray<FString> QuickHackNames = {TEXT("Interrupt Protocol"), TEXT("System Freeze"), TEXT("Firewall"), TEXT("Kill")};
 	
-	// Draw each QuickHack using the manager
+	// Draw each QuickHack using the actual names from the manager
 	for (int32 i = 0; i < 4; i++)
 	{
-		EQuickHackType Type = QuickHackManager->GetQuickHackInSlot(i + 1);
-		if (Type != EQuickHackType::None)
-		{
-			int32 Index = (int32)Type - 1; // Convert enum to array index
-			if (Index >= 0 && Index < QuickHackNames.Num())
-			{
-				DrawQuickHackStatusLineFromManager(QuickHackManager, i + 1, QuickHackNames[Index], i + 1, StartY + i * LineHeight);
-			}
-		}
+		int32 SlotIndex = i + 1;
+		FString QuickHackName = QuickHackManager->GetQuickHackNameInSlot(SlotIndex);
+		
+		// Always draw the slot, even if empty
+		DrawQuickHackStatusLineFromManager(QuickHackManager, SlotIndex, QuickHackName, SlotIndex, StartY + i * LineHeight);
 	}
 }
 
@@ -855,4 +871,607 @@ void ACybersoulsHUD::DrawPlayAgainButton()
 	// Instruction
 	FString InstructionText = TEXT("Press ENTER to continue with current XP");
 	DrawText(InstructionText, FColor(200, 255, 200), CenterX - 150.0f, ButtonY + ButtonHeight + 20.0f, HUDFont, 1.0f);
+}
+
+void ACybersoulsHUD::ToggleInventoryDisplay()
+{
+	APlayerController* PC = GetOwningPlayerController();
+	if (!PC)
+	{
+		UE_LOG(LogTemp, Error, TEXT("ToggleInventoryDisplay: No PlayerController found"));
+		return;
+	}
+
+	// Check if inventory is currently open (use bShowInventoryDisplay as the source of truth)
+	UE_LOG(LogTemp, Warning, TEXT("ToggleInventoryDisplay: bShowInventoryDisplay=%s, InventoryWidget=%s"), 
+		bShowInventoryDisplay ? TEXT("true") : TEXT("false"),
+		(InventoryWidget && IsValid(InventoryWidget)) ? TEXT("valid") : TEXT("null"));
+	
+	if (bShowInventoryDisplay || (InventoryWidget && IsValid(InventoryWidget)))
+	{
+		// Force close inventory
+		ForceCloseInventory();
+		UE_LOG(LogTemp, Warning, TEXT("Inventory closed"));
+		return;
+	}
+
+	// Check if we're trying to open but no widget class set
+	if (!InventoryWidgetClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("InventoryWidgetClass not set in BP_CybersoulsHUD! Please set it in Blueprint."));
+		UE_LOG(LogTemp, Error, TEXT("To fix: Open BP_CybersoulsHUD in Blueprint editor and set InventoryWidgetClass to your inventory widget"));
+		
+		// Create a simple test widget to verify the system works
+		UE_LOG(LogTemp, Error, TEXT("Creating TEST widget to verify system..."));
+		
+		// Use UserWidget base class for testing
+		InventoryWidget = CreateWidget<UInventoryWidget>(PC, UInventoryWidget::StaticClass());
+		if (!InventoryWidget)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to create widget even with StaticClass!"));
+			// Restore game controls since we can't create widget
+			PC->bShowMouseCursor = false;
+			PC->bEnableClickEvents = false;
+			PC->bEnableMouseOverEvents = false;
+			FInputModeGameOnly InputMode;
+			PC->SetInputMode(InputMode);
+			return;
+		}
+		
+		UE_LOG(LogTemp, Warning, TEXT("Created fallback inventory widget programmatically"));
+	}
+
+	// Try to open inventory
+	UE_LOG(LogTemp, Warning, TEXT("Attempting to create inventory widget..."));
+	
+	InventoryWidget = CreateWidget<UInventoryWidget>(GetWorld(), InventoryWidgetClass);
+	if (!InventoryWidget)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to create inventory widget from class"));
+		
+		// Restore game controls since widget creation failed
+		PC->bShowMouseCursor = false;
+		PC->bEnableClickEvents = false;
+		PC->bEnableMouseOverEvents = false;
+		FInputModeGameOnly InputMode;
+		PC->SetInputMode(InputMode);
+		return;
+	}
+
+	// Initialize with player's QuickHack manager
+	if (PlayerCharacter && PlayerCharacter->GetQuickHackManager())
+	{
+		InventoryWidget->InitializeInventory(PlayerCharacter->GetQuickHackManager());
+		UE_LOG(LogTemp, Warning, TEXT("Inventory initialized with QuickHack manager"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No PlayerCharacter or QuickHackManager found"));
+	}
+	
+	// Add to viewport with proper size and centering
+	InventoryWidget->AddToViewport(999); // Very high Z-order to ensure it's on top
+	InventoryWidget->SetVisibility(ESlateVisibility::Visible);
+	InventoryWidget->SetDesiredSizeInViewport(FVector2D(800.0f, 600.0f));
+	InventoryWidget->SetPositionInViewport(FVector2D(0.0f, 0.0f), false);
+	InventoryWidget->SetAnchorsInViewport(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
+	InventoryWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
+	bShowInventoryDisplay = true;
+	
+	// Force widget to be interactive
+	InventoryWidget->SetUserFocus(PC);
+	
+	UE_LOG(LogTemp, Warning, TEXT("Inventory widget visibility: %s"), 
+		*UEnum::GetValueAsString(InventoryWidget->GetVisibility()));
+	
+	// Enable mouse cursor and input
+	PC->bShowMouseCursor = true;
+	PC->bEnableClickEvents = true;
+	PC->bEnableMouseOverEvents = true;
+	
+	// Use GameAndUI mode for better compatibility
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(InventoryWidget->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	PC->SetInputMode(InputMode);
+	
+	UE_LOG(LogTemp, Warning, TEXT("Inventory widget added to viewport successfully with mouse controls"));
+}
+
+void ACybersoulsHUD::DrawCanvasInventory()
+{
+	if (!Canvas) return;
+	
+	// Get screen dimensions
+	float ScreenWidth = Canvas->SizeX;
+	float ScreenHeight = Canvas->SizeY;
+	
+	// Calculate inventory panel dimensions
+	float PanelWidth = 800.0f;
+	float PanelHeight = 600.0f;
+	float PanelX = (ScreenWidth - PanelWidth) * 0.5f;
+	float PanelY = (ScreenHeight - PanelHeight) * 0.5f;
+	
+	// Draw background
+	DrawRect(FLinearColor(0.1f, 0.1f, 0.1f, 0.9f), PanelX, PanelY, PanelWidth, PanelHeight);
+	
+	// Draw border
+	float BorderThickness = 4.0f;
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 1.0f), PanelX, PanelY, PanelWidth, BorderThickness); // Top
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 1.0f), PanelX, PanelY, BorderThickness, PanelHeight); // Left
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 1.0f), PanelX + PanelWidth - BorderThickness, PanelY, BorderThickness, PanelHeight); // Right
+	DrawRect(FLinearColor(0.2f, 0.8f, 1.0f, 1.0f), PanelX, PanelY + PanelHeight - BorderThickness, PanelWidth, BorderThickness); // Bottom
+	
+	float CurrentY = PanelY + 20.0f;
+	float LineHeight = 30.0f;
+	
+	// Title
+	DrawText(TEXT("▰▰ CYBERSOULS INVENTORY ▰▰"), FColor::Cyan, PanelX + 50.0f, CurrentY, HUDFont, 1.5f);
+	CurrentY += LineHeight * 1.5f;
+	
+	// XP Display
+	APlayerController* PC = GetOwningPlayerController();
+	if (PC && PC->GetPawn())
+	{
+		UPlayerProgressionComponent* Progression = PC->GetPawn()->FindComponentByClass<UPlayerProgressionComponent>();
+		if (Progression)
+		{
+			FString IntegrityXPText = FString::Printf(TEXT("⚡ INTEGRITY XP: %.0f"), Progression->GetIntegrityXP());
+			FString HackingXPText = FString::Printf(TEXT("🔧 HACKING XP: %.0f"), Progression->GetHackingXP());
+			
+			DrawText(IntegrityXPText, FColor::Green, PanelX + 50.0f, CurrentY, HUDFont, 1.2f);
+			CurrentY += LineHeight;
+			DrawText(HackingXPText, FColor::Blue, PanelX + 50.0f, CurrentY, HUDFont, 1.2f);
+			CurrentY += LineHeight * 1.5f;
+		}
+	}
+	
+	// QuickHacks Section
+	DrawText(TEXT("▰ QUICKHACKS (Click to change)"), FColor::Yellow, PanelX + 50.0f, CurrentY, HUDFont, 1.3f);
+	CurrentY += LineHeight;
+	
+	// Draw equipped QuickHacks with slot backgrounds
+	for (int32 i = 0; i < 4; i++)
+	{
+		float SlotY = CurrentY + (i * LineHeight * 0.8f);
+		float SlotHeight = LineHeight * 0.8f;
+		
+		// Draw slot background (darker for clickable area)
+		DrawRect(FLinearColor(0.2f, 0.2f, 0.3f, 0.7f), PanelX + 70.0f, SlotY, PanelWidth - 120.0f, SlotHeight);
+		
+		// Draw slot border
+		float SlotBorderThickness = 1.0f;
+		DrawRect(FLinearColor(0.4f, 0.6f, 0.8f, 0.8f), PanelX + 70.0f, SlotY, PanelWidth - 120.0f, SlotBorderThickness);
+		DrawRect(FLinearColor(0.4f, 0.6f, 0.8f, 0.8f), PanelX + 70.0f, SlotY + SlotHeight - SlotBorderThickness, PanelWidth - 120.0f, SlotBorderThickness);
+		DrawRect(FLinearColor(0.4f, 0.6f, 0.8f, 0.8f), PanelX + 70.0f, SlotY, SlotBorderThickness, SlotHeight);
+		DrawRect(FLinearColor(0.4f, 0.6f, 0.8f, 0.8f), PanelX + PanelWidth - 50.0f - SlotBorderThickness, SlotY, SlotBorderThickness, SlotHeight);
+		
+		FString QuickHackText = FString::Printf(TEXT("%d. %s"), i + 1, *GetEquippedQuickHackName(i));
+		DrawText(QuickHackText, FColor::White, PanelX + 80.0f, SlotY + 5.0f, HUDFont);
+	}
+	CurrentY += 4 * LineHeight * 0.8f;
+	
+	CurrentY += LineHeight * 0.5f;
+	
+	// Passive Abilities Section
+	DrawText(TEXT("▰ PASSIVE ABILITIES (Click to change)"), FColor::Magenta, PanelX + 50.0f, CurrentY, HUDFont, 1.3f);
+	CurrentY += LineHeight;
+	
+	// Draw equipped Passives with slot backgrounds
+	for (int32 i = 0; i < 4; i++)
+	{
+		float SlotY = CurrentY + (i * LineHeight * 0.8f);
+		float SlotHeight = LineHeight * 0.8f;
+		
+		// Draw slot background (darker for clickable area)
+		DrawRect(FLinearColor(0.3f, 0.2f, 0.3f, 0.7f), PanelX + 70.0f, SlotY, PanelWidth - 120.0f, SlotHeight);
+		
+		// Draw slot border
+		float PassiveBorderThickness = 1.0f;
+		DrawRect(FLinearColor(0.8f, 0.4f, 0.8f, 0.8f), PanelX + 70.0f, SlotY, PanelWidth - 120.0f, PassiveBorderThickness);
+		DrawRect(FLinearColor(0.8f, 0.4f, 0.8f, 0.8f), PanelX + 70.0f, SlotY + SlotHeight - PassiveBorderThickness, PanelWidth - 120.0f, PassiveBorderThickness);
+		DrawRect(FLinearColor(0.8f, 0.4f, 0.8f, 0.8f), PanelX + 70.0f, SlotY, PassiveBorderThickness, SlotHeight);
+		DrawRect(FLinearColor(0.8f, 0.4f, 0.8f, 0.8f), PanelX + PanelWidth - 50.0f - PassiveBorderThickness, SlotY, PassiveBorderThickness, SlotHeight);
+		
+		FString PassiveText = FString::Printf(TEXT("%d. %s"), i + 1, *GetEquippedPassiveName(i));
+		DrawText(PassiveText, FColor::White, PanelX + 80.0f, SlotY + 5.0f, HUDFont);
+	}
+	
+	// Instructions
+	DrawText(TEXT("Press Tab to close | Click slots for dropdown menu"), FColor::Orange, PanelX + 50.0f, PanelY + PanelHeight - 40.0f, HUDFont);
+	
+	// Enable mouse cursor when inventory is shown
+	APlayerController* PlayerController = GetOwningPlayerController();
+	if (PlayerController && !PlayerController->bShowMouseCursor)
+	{
+		PlayerController->bShowMouseCursor = true;
+		PlayerController->bEnableClickEvents = true;
+		PlayerController->bEnableMouseOverEvents = true;
+		
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		PlayerController->SetInputMode(InputMode);
+	}
+	
+	// Handle mouse clicks
+	if (PlayerController)
+	{
+		float MouseX, MouseY;
+		PlayerController->GetMousePosition(MouseX, MouseY);
+		
+		// Check for mouse click
+		bool bCurrentMousePressed = PlayerController->IsInputKeyDown(EKeys::LeftMouseButton);
+		if (bCurrentMousePressed && !bMouseButtonPressed)
+		{
+			// Mouse button just pressed
+			HandleInventoryMouseClick(MouseX, MouseY);
+		}
+		bMouseButtonPressed = bCurrentMousePressed;
+	}
+	
+	// Draw dropdowns on top of everything else
+	DrawQuickHackDropdown(PanelX, PanelWidth);
+	DrawPassiveDropdown(PanelX, PanelWidth);
+}
+
+void ACybersoulsHUD::ForceCloseInventory()
+{
+	APlayerController* PC = GetOwningPlayerController();
+	if (!PC)
+	{
+		return;
+	}
+
+	// Force close any inventory widget
+	if (InventoryWidget && IsValid(InventoryWidget))
+	{
+		InventoryWidget->RemoveFromParent();
+		InventoryWidget = nullptr;
+	}
+
+	// Reset the display flag
+	bShowInventoryDisplay = false;
+	
+	// Close any open dropdowns
+	CloseAllDropdowns();
+
+	// Restore controls based on player controller settings
+	if (ACyberSoulsPlayerController* CyberPC = Cast<ACyberSoulsPlayerController>(PC))
+	{
+		if (CyberPC->bEnableMouseInGameplay)
+		{
+			PC->bShowMouseCursor = true;
+			PC->bEnableClickEvents = true;
+			PC->bEnableMouseOverEvents = true;
+			
+			if (CyberPC->bUseGameAndUIInputMode)
+			{
+				FInputModeGameAndUI InputMode;
+				InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockInFullscreen);
+				InputMode.SetHideCursorDuringCapture(false);
+				PC->SetInputMode(InputMode);
+			}
+			else
+			{
+				FInputModeGameOnly InputMode;
+				PC->SetInputMode(InputMode);
+			}
+		}
+		else
+		{
+			PC->bShowMouseCursor = false;
+			PC->bEnableClickEvents = false;
+			PC->bEnableMouseOverEvents = false;
+			FInputModeGameOnly InputMode;
+			PC->SetInputMode(InputMode);
+		}
+	}
+	else
+	{
+		// Fallback to default game-only mode
+		PC->bShowMouseCursor = false;
+		PC->bEnableClickEvents = false;
+		PC->bEnableMouseOverEvents = false;
+		FInputModeGameOnly InputMode;
+		PC->SetInputMode(InputMode);
+	}
+	
+	UE_LOG(LogTemp, Warning, TEXT("ForceCloseInventory: Game controls restored"));
+}
+
+void ACybersoulsHUD::InitializeAvailableAbilities()
+{
+	// Initialize available QuickHacks based on CLAUDE.md specifications
+	AvailableQuickHacks.Empty();
+	AvailableQuickHacks.Add(TEXT("Cascade Virus"));
+	AvailableQuickHacks.Add(TEXT("Ghost Protocol"));
+	AvailableQuickHacks.Add(TEXT("Charge Drain"));
+	AvailableQuickHacks.Add(TEXT("Gravity Flip"));
+	AvailableQuickHacks.Add(TEXT("System Shock"));
+	AvailableQuickHacks.Add(TEXT("Neural Disrupt"));
+	AvailableQuickHacks.Add(TEXT("Data Breach"));
+	AvailableQuickHacks.Add(TEXT("Memory Wipe"));
+	
+	// Initialize available passive abilities
+	AvailablePassives.Empty();
+	AvailablePassives.Add(TEXT("Execution Chains"));
+	AvailablePassives.Add(TEXT("System Overcharge"));
+	AvailablePassives.Add(TEXT("Neural Buffer"));
+	AvailablePassives.Add(TEXT("Cyber Resilience"));
+	AvailablePassives.Add(TEXT("Data Recovery"));
+	AvailablePassives.Add(TEXT("Signal Boost"));
+	
+	// Initialize equipped abilities (start with first 4 QuickHacks and Passives)
+	EquippedQuickHackIndices.SetNum(4);
+	for (int32 i = 0; i < 4; i++)
+	{
+		EquippedQuickHackIndices[i] = i; // Start with first 4 QuickHacks
+	}
+	
+	EquippedPassiveIndices.SetNum(4);
+	for (int32 i = 0; i < 4; i++)
+	{
+		EquippedPassiveIndices[i] = i; // Start with first 4 Passives
+	}
+}
+
+void ACybersoulsHUD::HandleInventoryMouseClick(float MouseX, float MouseY)
+{
+	if (!bShowInventoryDisplay || !Canvas) return;
+	
+	// Check if clicking on dropdown items first
+	if (bShowQuickHackDropdown || bShowPassiveDropdown)
+	{
+		HandleDropdownSelection(MouseX, MouseY);
+		return;
+	}
+	
+	// Calculate inventory panel dimensions (same as in DrawCanvasInventory)
+	float ScreenWidth = Canvas->SizeX;
+	float ScreenHeight = Canvas->SizeY;
+	float PanelWidth = 800.0f;
+	float PanelHeight = 600.0f;
+	float PanelX = (ScreenWidth - PanelWidth) * 0.5f;
+	float PanelY = (ScreenHeight - PanelHeight) * 0.5f;
+	
+	// Calculate QuickHack section position (MUST match DrawCanvasInventory exactly)
+	float CurrentY = PanelY + 20.0f; // Start position
+	float LineHeight = 30.0f;
+	
+	// Skip title
+	CurrentY += LineHeight * 1.5f;
+	
+	// Skip XP section - check if we have progression component
+	APlayerController* PC = GetOwningPlayerController();
+	if (PC && PC->GetPawn())
+	{
+		UPlayerProgressionComponent* Progression = PC->GetPawn()->FindComponentByClass<UPlayerProgressionComponent>();
+		if (Progression)
+		{
+			CurrentY += LineHeight; // Integrity XP
+			CurrentY += LineHeight; // Hacking XP  
+			CurrentY += LineHeight * 1.5f; // Extra spacing
+		}
+	}
+	
+	// Skip QuickHacks title
+	CurrentY += LineHeight;
+	
+	// Check if click is in QuickHack slots area
+	float SlotHeight = LineHeight * 0.8f;
+	for (int32 i = 0; i < 4; i++)
+	{
+		float SlotY = CurrentY + (i * SlotHeight);
+		if (MouseY >= SlotY && MouseY <= SlotY + SlotHeight &&
+			MouseX >= PanelX + 70.0f && MouseX <= PanelX + PanelWidth - 50.0f)
+		{
+			OpenQuickHackDropdown(i, SlotY);
+			UE_LOG(LogTemp, Warning, TEXT("Opened QuickHack dropdown for slot %d at Y=%f"), i + 1, SlotY);
+			return;
+		}
+	}
+	
+	// Calculate Passive section position
+	CurrentY += (4 * SlotHeight); // QuickHacks slots
+	CurrentY += LineHeight * 0.5f; // Spacing after QuickHacks
+	CurrentY += LineHeight; // Passives title
+	
+	// Check if click is in Passive slots area
+	for (int32 i = 0; i < 4; i++)
+	{
+		float SlotY = CurrentY + (i * SlotHeight);
+		if (MouseY >= SlotY && MouseY <= SlotY + SlotHeight &&
+			MouseX >= PanelX + 70.0f && MouseX <= PanelX + PanelWidth - 50.0f)
+		{
+			OpenPassiveDropdown(i, SlotY);
+			UE_LOG(LogTemp, Warning, TEXT("Opened Passive dropdown for slot %d at Y=%f"), i + 1, SlotY);
+			return;
+		}
+	}
+}
+
+void ACybersoulsHUD::OpenQuickHackDropdown(int32 SlotIndex, float SlotY)
+{
+	CloseAllDropdowns(); // Close any existing dropdowns
+	
+	bShowQuickHackDropdown = true;
+	ActiveDropdownSlot = SlotIndex;
+	DropdownStartY = SlotY + 25.0f; // Start dropdown below the slot
+	
+	UE_LOG(LogTemp, Warning, TEXT("Opened QuickHack dropdown for slot %d"), SlotIndex + 1);
+}
+
+void ACybersoulsHUD::OpenPassiveDropdown(int32 SlotIndex, float SlotY)
+{
+	CloseAllDropdowns(); // Close any existing dropdowns
+	
+	bShowPassiveDropdown = true;
+	ActiveDropdownSlot = SlotIndex;
+	DropdownStartY = SlotY + 25.0f; // Start dropdown below the slot
+	
+	UE_LOG(LogTemp, Warning, TEXT("Opened Passive dropdown for slot %d"), SlotIndex + 1);
+}
+
+void ACybersoulsHUD::CloseAllDropdowns()
+{
+	bShowQuickHackDropdown = false;
+	bShowPassiveDropdown = false;
+	ActiveDropdownSlot = -1;
+}
+
+void ACybersoulsHUD::HandleDropdownSelection(float MouseX, float MouseY)
+{
+	if (!Canvas) return;
+	
+	float ScreenWidth = Canvas->SizeX;
+	float PanelWidth = 800.0f;
+	float PanelX = (ScreenWidth - PanelWidth) * 0.5f;
+	
+	if (bShowQuickHackDropdown)
+	{
+		// Check if click is within QuickHack dropdown area
+		float DropdownWidth = PanelWidth - 120.0f;
+		float DropdownHeight = AvailableQuickHacks.Num() * DropdownItemHeight;
+		
+		if (MouseX >= PanelX + 70.0f && MouseX <= PanelX + 70.0f + DropdownWidth &&
+			MouseY >= DropdownStartY && MouseY <= DropdownStartY + DropdownHeight)
+		{
+			// Calculate which item was clicked
+			int32 ClickedIndex = (MouseY - DropdownStartY) / DropdownItemHeight;
+			if (ClickedIndex >= 0 && ClickedIndex < AvailableQuickHacks.Num())
+			{
+				// Set the selected QuickHack
+				if (ActiveDropdownSlot >= 0 && ActiveDropdownSlot < EquippedQuickHackIndices.Num())
+				{
+					EquippedQuickHackIndices[ActiveDropdownSlot] = ClickedIndex;
+					UE_LOG(LogTemp, Warning, TEXT("QuickHack Slot %d changed to: %s"), 
+						ActiveDropdownSlot + 1, *AvailableQuickHacks[ClickedIndex]);
+				}
+			}
+		}
+		CloseAllDropdowns();
+	}
+	else if (bShowPassiveDropdown)
+	{
+		// Check if click is within Passive dropdown area
+		float DropdownWidth = PanelWidth - 120.0f;
+		float DropdownHeight = AvailablePassives.Num() * DropdownItemHeight;
+		
+		if (MouseX >= PanelX + 70.0f && MouseX <= PanelX + 70.0f + DropdownWidth &&
+			MouseY >= DropdownStartY && MouseY <= DropdownStartY + DropdownHeight)
+		{
+			// Calculate which item was clicked
+			int32 ClickedIndex = (MouseY - DropdownStartY) / DropdownItemHeight;
+			if (ClickedIndex >= 0 && ClickedIndex < AvailablePassives.Num())
+			{
+				// Set the selected Passive
+				if (ActiveDropdownSlot >= 0 && ActiveDropdownSlot < EquippedPassiveIndices.Num())
+				{
+					EquippedPassiveIndices[ActiveDropdownSlot] = ClickedIndex;
+					UE_LOG(LogTemp, Warning, TEXT("Passive Slot %d changed to: %s"), 
+						ActiveDropdownSlot + 1, *AvailablePassives[ClickedIndex]);
+				}
+			}
+		}
+		// If we reach here, the click was outside the dropdown - close it
+		CloseAllDropdowns();
+	}
+}
+
+FString ACybersoulsHUD::GetEquippedQuickHackName(int32 SlotIndex) const
+{
+	if (SlotIndex < 0 || SlotIndex >= EquippedQuickHackIndices.Num()) return TEXT("Empty");
+	
+	int32 QuickHackIndex = EquippedQuickHackIndices[SlotIndex];
+	if (QuickHackIndex < 0 || QuickHackIndex >= AvailableQuickHacks.Num()) return TEXT("Empty");
+	
+	return AvailableQuickHacks[QuickHackIndex];
+}
+
+FString ACybersoulsHUD::GetEquippedPassiveName(int32 SlotIndex) const
+{
+	if (SlotIndex < 0 || SlotIndex >= EquippedPassiveIndices.Num()) return TEXT("Empty");
+	
+	int32 PassiveIndex = EquippedPassiveIndices[SlotIndex];
+	if (PassiveIndex < 0 || PassiveIndex >= AvailablePassives.Num()) return TEXT("Empty");
+	
+	return AvailablePassives[PassiveIndex];
+}
+
+void ACybersoulsHUD::DrawQuickHackDropdown(float PanelX, float PanelWidth)
+{
+	if (!bShowQuickHackDropdown || !Canvas) return;
+	
+	float DropdownWidth = PanelWidth - 120.0f;
+	float DropdownHeight = AvailableQuickHacks.Num() * DropdownItemHeight;
+	float DropdownX = PanelX + 70.0f;
+	
+	// Draw dropdown background
+	DrawRect(FLinearColor(0.15f, 0.15f, 0.2f, 0.95f), DropdownX, DropdownStartY, DropdownWidth, DropdownHeight);
+	
+	// Draw dropdown border
+	float BorderThickness = 2.0f;
+	DrawRect(FLinearColor(0.4f, 0.6f, 0.8f, 1.0f), DropdownX, DropdownStartY, DropdownWidth, BorderThickness);
+	DrawRect(FLinearColor(0.4f, 0.6f, 0.8f, 1.0f), DropdownX, DropdownStartY + DropdownHeight - BorderThickness, DropdownWidth, BorderThickness);
+	DrawRect(FLinearColor(0.4f, 0.6f, 0.8f, 1.0f), DropdownX, DropdownStartY, BorderThickness, DropdownHeight);
+	DrawRect(FLinearColor(0.4f, 0.6f, 0.8f, 1.0f), DropdownX + DropdownWidth - BorderThickness, DropdownStartY, BorderThickness, DropdownHeight);
+	
+	// Draw each QuickHack option
+	for (int32 i = 0; i < AvailableQuickHacks.Num(); i++)
+	{
+		float ItemY = DropdownStartY + (i * DropdownItemHeight);
+		
+		// Highlight currently equipped QuickHack
+		bool bIsEquipped = (ActiveDropdownSlot >= 0 && ActiveDropdownSlot < EquippedQuickHackIndices.Num() && 
+							EquippedQuickHackIndices[ActiveDropdownSlot] == i);
+		
+		if (bIsEquipped)
+		{
+			DrawRect(FLinearColor(0.3f, 0.5f, 0.7f, 0.6f), DropdownX + 2.0f, ItemY, DropdownWidth - 4.0f, DropdownItemHeight);
+		}
+		
+		// Draw QuickHack name
+		FColor TextColor = bIsEquipped ? FColor::Yellow : FColor::White;
+		DrawText(AvailableQuickHacks[i], TextColor, DropdownX + 10.0f, ItemY + 3.0f, HUDFont, 0.9f);
+	}
+}
+
+void ACybersoulsHUD::DrawPassiveDropdown(float PanelX, float PanelWidth)
+{
+	if (!bShowPassiveDropdown || !Canvas) return;
+	
+	float DropdownWidth = PanelWidth - 120.0f;
+	float DropdownHeight = AvailablePassives.Num() * DropdownItemHeight;
+	float DropdownX = PanelX + 70.0f;
+	
+	// Draw dropdown background
+	DrawRect(FLinearColor(0.2f, 0.15f, 0.2f, 0.95f), DropdownX, DropdownStartY, DropdownWidth, DropdownHeight);
+	
+	// Draw dropdown border
+	float BorderThickness = 2.0f;
+	DrawRect(FLinearColor(0.8f, 0.4f, 0.8f, 1.0f), DropdownX, DropdownStartY, DropdownWidth, BorderThickness);
+	DrawRect(FLinearColor(0.8f, 0.4f, 0.8f, 1.0f), DropdownX, DropdownStartY + DropdownHeight - BorderThickness, DropdownWidth, BorderThickness);
+	DrawRect(FLinearColor(0.8f, 0.4f, 0.8f, 1.0f), DropdownX, DropdownStartY, BorderThickness, DropdownHeight);
+	DrawRect(FLinearColor(0.8f, 0.4f, 0.8f, 1.0f), DropdownX + DropdownWidth - BorderThickness, DropdownStartY, BorderThickness, DropdownHeight);
+	
+	// Draw each Passive option
+	for (int32 i = 0; i < AvailablePassives.Num(); i++)
+	{
+		float ItemY = DropdownStartY + (i * DropdownItemHeight);
+		
+		// Highlight currently equipped Passive
+		bool bIsEquipped = (ActiveDropdownSlot >= 0 && ActiveDropdownSlot < EquippedPassiveIndices.Num() && 
+							EquippedPassiveIndices[ActiveDropdownSlot] == i);
+		
+		if (bIsEquipped)
+		{
+			DrawRect(FLinearColor(0.7f, 0.3f, 0.7f, 0.6f), DropdownX + 2.0f, ItemY, DropdownWidth - 4.0f, DropdownItemHeight);
+		}
+		
+		// Draw Passive name
+		FColor TextColor = bIsEquipped ? FColor::Yellow : FColor::White;
+		DrawText(AvailablePassives[i], TextColor, DropdownX + 10.0f, ItemY + 3.0f, HUDFont, 0.9f);
+	}
 }

@@ -1,6 +1,7 @@
 #include "cybersouls/Public/AI/BaseEnemyAIController.h"
 #include "cybersouls/Public/Enemy/CybersoulsEnemyBase.h"
 #include "cybersouls/Public/Character/cybersoulsCharacter.h"
+#include "cybersouls/Public/Character/PlayerCyberState.h"
 #include "cybersouls/Public/Attributes/PlayerAttributeComponent.h"
 #include "cybersouls/Public/CybersoulsUtils.h"
 #include "Kismet/GameplayStatics.h"
@@ -24,16 +25,8 @@ void ABaseEnemyAIController::OnPossess(APawn* InPawn)
     Super::OnPossess(InPawn);
     ControlledEnemy = Cast<ACybersoulsEnemyBase>(InPawn);
     
-    // Initialize player target
-    PlayerTarget = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
-    if (PlayerTarget)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("BaseEnemyAI: Found player target for %s"), InPawn ? *InPawn->GetName() : TEXT("Unknown"));
-    }
-    else
-    {
-        UE_LOG(LogTemp, Error, TEXT("BaseEnemyAI: Failed to find player target for %s"), InPawn ? *InPawn->GetName() : TEXT("Unknown"));
-    }
+    // Initialize player target using the new logic that respects character types
+    UpdatePlayerTarget();
 }
 
 void ABaseEnemyAIController::OnUnPossess()
@@ -145,4 +138,34 @@ void ABaseEnemyAIController::StopAlertingAllies()
     bIsAlertingAllies = false;
     CurrentTarget = nullptr;
     GetWorld()->GetTimerManager().ClearTimer(AlertUpdateTimerHandle);
+}
+
+void ABaseEnemyAIController::UpdatePlayerTarget()
+{
+    // Get the current player character
+    AActor* NewPlayerTarget = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
+    
+    // Check if the new target is a CyberState character - if so, ignore it
+    if (NewPlayerTarget)
+    {
+        // Only chase default character (cybersoulsCharacter), ignore CyberState
+        APlayerCyberState* CyberStateChar = Cast<APlayerCyberState>(NewPlayerTarget);
+        if (CyberStateChar)
+        {
+            // Player is using CyberState - enemies should not chase
+            PlayerTarget = nullptr;
+            UE_LOG(LogTemp, Warning, TEXT("BaseEnemyAI: Player using CyberState - %s will not chase"), 
+                ControlledEnemy ? *ControlledEnemy->GetName() : TEXT("Unknown"));
+            return;
+        }
+        
+        // Player is using default character - update target normally
+        if (NewPlayerTarget != PlayerTarget)
+        {
+            PlayerTarget = NewPlayerTarget;
+            UE_LOG(LogTemp, Warning, TEXT("BaseEnemyAI: Updated player target to %s for %s"), 
+                *PlayerTarget->GetName(), 
+                ControlledEnemy ? *ControlledEnemy->GetName() : TEXT("Unknown"));
+        }
+    }
 }

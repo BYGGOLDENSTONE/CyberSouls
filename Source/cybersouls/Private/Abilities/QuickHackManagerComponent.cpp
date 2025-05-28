@@ -286,3 +286,45 @@ bool UQuickHackManagerComponent::IsValidSlot(int32 SlotIndex) const
 {
     return SlotIndex >= 1 && SlotIndex <= MAX_QUICKHACK_SLOTS;
 }
+
+FString UQuickHackManagerComponent::GetQuickHackName(EQuickHackType QuickHackType) const
+{
+    switch (QuickHackType)
+    {
+        case EQuickHackType::InterruptProtocol:
+            return TEXT("Interrupt Protocol");
+        case EQuickHackType::SystemFreeze:
+            return TEXT("System Freeze");
+        case EQuickHackType::Firewall:
+            return TEXT("Firewall");
+        case EQuickHackType::Kill:
+            return TEXT("Kill");
+        case EQuickHackType::CascadeVirus:
+            return TEXT("Cascade Virus");
+        case EQuickHackType::GhostProtocol:
+            return TEXT("Ghost Protocol");
+        case EQuickHackType::ChargeDrain:
+            return TEXT("Charge Drain");
+        case EQuickHackType::GravityFlip:
+            return TEXT("Gravity Flip");
+        case EQuickHackType::None:
+        default:
+            return TEXT("Empty");
+    }
+}
+
+FString UQuickHackManagerComponent::GetQuickHackNameInSlot(int32 SlotIndex) const
+{
+    if (!IsValidSlot(SlotIndex))
+    {
+        return TEXT("Invalid Slot");
+    }
+    
+    int32 ArrayIndex = SlotIndex - 1;
+    if (ArrayIndex < EquippedQuickHacks.Num())
+    {
+        return GetQuickHackName(EquippedQuickHacks[ArrayIndex]);
+    }
+    
+    return TEXT("Empty");
+}

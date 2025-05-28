@@ -8,6 +8,7 @@
 class UPlayerCyberStateAttributeComponent;
 class UDoubleJumpAbilityComponent;
 class UDashAbilityComponent;
+class UTargetingComponent;
 class UInputMappingContext;
 class UInputAction;
 
@@ -34,6 +35,9 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UDashAbilityComponent* DashComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    UTargetingComponent* TargetingComponent;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
     float EnhancedMoveSpeed = 1200.0f;

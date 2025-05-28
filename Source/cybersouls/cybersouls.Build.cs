@@ -15,6 +15,8 @@ public class cybersouls : ModuleRules
 			"InputCore", 
 			"EnhancedInput",
 			"UMG",
+			"Slate",
+			"SlateCore",
 			"AIModule",
 			"NavigationSystem"
 		});

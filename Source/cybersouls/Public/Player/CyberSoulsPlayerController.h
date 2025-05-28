@@ -48,6 +48,13 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     UCyberSoulsInputConfig* InputConfig;
+    
+    // Mouse control settings
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Mouse Control")
+    bool bEnableMouseInGameplay = false;
+    
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Mouse Control")
+    bool bUseGameAndUIInputMode = false;
 
 protected:
     virtual void BeginPlay() override;
@@ -65,6 +72,7 @@ private:
     void TransferCameraSettings(APawn* FromPawn, APawn* ToPawn);
     void StoreCharacterState(APawn* CharacterPawn);
     void RestoreCharacterState(APawn* CharacterPawn);
+    void UpdateAllAIControllers();
     
     // Character state preservation
     struct FCharacterState

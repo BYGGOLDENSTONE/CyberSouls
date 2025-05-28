@@ -81,6 +81,14 @@ public:
     UFUNCTION(BlueprintCallable, Category = "QuickHack")
     TArray<EQuickHackType> GetAllEquippedQuickHacks() const { return EquippedQuickHacks; }
 
+    // Get the display name for a QuickHack type
+    UFUNCTION(BlueprintCallable, Category = "QuickHack")
+    FString GetQuickHackName(EQuickHackType QuickHackType) const;
+
+    // Get the display name for a QuickHack in a specific slot
+    UFUNCTION(BlueprintCallable, Category = "QuickHack")
+    FString GetQuickHackNameInSlot(int32 SlotIndex) const;
+
 protected:
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;

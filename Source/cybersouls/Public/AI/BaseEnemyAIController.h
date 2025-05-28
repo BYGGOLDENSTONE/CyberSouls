@@ -19,6 +19,15 @@ class CYBERSOULS_API ABaseEnemyAIController : public AAIController
 public:
 	ABaseEnemyAIController();
 
+	/**
+	 * Update player target reference when character switches
+	 * 
+	 * Called when the player switches between characters to ensure
+	 * AI controllers track the correct player pawn.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "AI")
+	void UpdatePlayerTarget();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
