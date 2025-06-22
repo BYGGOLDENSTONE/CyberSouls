@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(rmdir:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(\"C:\\Program Files\\Epic Games\\UE_5.4\\Engine\\Build\\BatchFiles\\Build.bat\" cybersoulsEditor Win64 Development \"/mnt/d/Unreal Projects/cybersouls/cybersouls.uproject\" -waitmutex)",
+      "Bash(rm:*)",
+      "Bash(\"/mnt/c/Program Files/Epic Games/UE_5.4/Engine/Build/BatchFiles/Build.bat\" cybersoulsEditor Win64 Development -Project=\"/mnt/d/Unreal Projects/cybersouls/cybersouls.uproject\" -Progress)",
+      "Bash(cat:*)",
+      "Bash(git add:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+      "Bash(cp:*)",
+      "Bash(sed:*)",
+      "Bash(\"C:\\Program Files\\Epic Games\\UE_5.4\\Engine\\Build\\BatchFiles\\Build.bat\" cybersoulsEditor Win64 Development \"D:\\Unreal Projects\\cybersouls\\cybersouls.uproject\" -waitmutex)",
+      "Bash(clear)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(rg:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(claude mcp:*)",
+      "Bash(ls:*)",
+      "Bash(npx --version)",
+      "Bash(claude --debug)",
+      "Bash(echo $SHELL)",
+      "Bash(claude --no-mcp)",
+      "Bash(touch:*)"
+    ],
+    "deny": []
+  }
+}
