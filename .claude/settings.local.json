@@ -29,5 +29,11 @@
       "Bash(touch:*)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "filesystem",
+    "memory",
+    "git"
+  ],
+  "enableAllProjectMcpServers": true
 }
